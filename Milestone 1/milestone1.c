@@ -18,9 +18,9 @@ static uint16_t bytes_read;
 QueueHandle_t Q_songname;
 QueueHandle_t Q_songdata;
 
-static void open_file(FIL *file, songname_t *name) { f_open(file, name[0], FA_READ); }
-static void read_file(FIL *file, char *bytes) { f_read(file, bytes, 512, bytes_read); }
-static void close_file(FIL *this_file) { f_close(this_file); }
+static void open_file(FIL *file, songname_t *name) { f_open(&file, &name[0], FA_READ); }
+static void read_file(FIL *file, char *bytes) { f_read(&file, &bytes, 512, bytes_read); }
+static void close_file(FIL *this_file) { f_close(&this_file); }
 
 // Reader tasks receives song-name over Q_songname to start reading it
 void mp3_reader_task(void *p)
