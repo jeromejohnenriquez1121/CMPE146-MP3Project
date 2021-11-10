@@ -12,40 +12,61 @@
 #include "periodic_scheduler.h"
 #include "queue.h"
 #include "sj2_cli.h"
+#include <string.h>
 
 typedef char songname_t[16];
-typedef char songdata_t[512];
-static uint16_t bytes_read;
-
+static UINT bytes_read;
+static songname_t song_name;
 QueueHandle_t Q_songname;
 QueueHandle_t Q_songdata;
 
-static void open_file(FIL *file, songname_t *name) { f_open(&file, &name[0], FA_READ); }
-static void read_file(FIL *file, char *bytes) { f_read(&file, &bytes[0], sizeof(&bytes[0]), &bytes_read); }
-static void close_file(FIL *this_file) { f_close(&this_file); }
+static FRESULT fr;
+
+// static FRESULT f_read_from_file(FIL *this_file_struct, char *input_bytes){
+//   return f_read(this_file_struct, );
+// }
 
 // Reader tasks receives song-name over Q_songname to start reading it
 void mp3_reader_task(void *p)
 {
-  songname_t name;
+  char temp_name[16];
   char bytes_512[512];
   while (1)
   {
     printf("Waiting for song to receive.\n");
-    xQueueReceive(Q_songname, &name[0], portMAX_DELAY);
-    printf("Received song to play: %s.\n", &name[0]);
+    xQueueReceive(Q_songname, &temp_name[0], portMAX_DELAY);
+    strcpy(song_name, temp_name);
+    printf("Received %s.\n", song_name);
 
     FIL *file;
-    open_file(&file, &name[0]);
-    printf("Opened file: %s.\n", &name[0]);
-    while (bytes_read != 0)
+    fr = f_open(&file, &song_name[0], FA_READ);
+    printf("Opening %s.\n", song_name);
+    if (fr == FR_OK)
     {
-      read_file(&file, &name[0]);
-      xQueueSend(Q_songdata, &bytes_512[0], portMAX_DELAY);
-      printf("Sent 512 bytes.\n");
+      UINT byte_count = 0;
+
+      while (1)
+      {
+
+        f_read(&file, &bytes_512[0], sizeof(bytes_512), &bytes_read);
+        if (bytes_read == 0)
+        {
+          fr = f_close(&file);
+          printf("Closed %s.\n", song_name);
+          break;
+        }
+        printf("Bytes read: %d\n", bytes_read);
+        xQueueSend(Q_songdata, &bytes_512[0], portMAX_DELAY);
+        printf("%s\n", bytes_512);
+        memset(bytes_512, 0, sizeof(bytes_512));
+        byte_count += bytes_read;
+        printf("Byte count: %d\n", byte_count);
+      }
     }
-    close_file(&file);
-    printf("Closed file: %s.\n", &name[0]);
+    else
+    {
+      printf("Cannot open file\n");
+    }
   }
 }
 
@@ -56,11 +77,11 @@ void mp3_reader_task(void *p)
 //   while (1) {
 //     xQueueReceive(Q_songdata, &bytes_512[0], portMAX_DELAY);
 //     for (int i = 0; i < sizeof(bytes_512); i++) {
-//       while (!mp3_decoder_needs_data()) {
+//       while (mp3_decoder_needs_data) {
 //         vTaskDelay(1);
 //       }
 
-//       spi_send_to_mp3_decoder(bytes_512[i]);
+//       // spi_send_to_mp3_decoder(bytes_512[i]);
 //     }
 //   }
 // }
@@ -92,6 +113,6 @@ app_cli_status_e cli__play_song(app_cli__argument_t argument, sl_string_s user_i
 
   xQueueSend(Q_songname, &user_input_minus_command_name, portMAX_DELAY);
 
-  printf("Sent %s over to the Q_songname\n", user_input_minus_command_name.cstring);
+  printf("Sent %s\n", user_input_minus_command_name.cstring);
   return APP_CLI_STATUS__SUCCESS;
 }
