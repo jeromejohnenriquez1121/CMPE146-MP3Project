@@ -1,6 +1,5 @@
 //main.c
 
-#include <stdbool.h>
 #include <stdio.h>
 
 #include "FreeRTOS.h"
@@ -8,97 +7,35 @@
 
 #include "board_io.h"
 #include "common_macros.h"
-#include "ff.h"
 #include "periodic_scheduler.h"
 #include "queue.h"
 #include "sj2_cli.h"
-#include <string.h>
+#include "song.h"
 
-typedef char songname_t[16];
-static UINT bytes_read;
-static songname_t song_name;
-QueueHandle_t Q_songname;
-QueueHandle_t Q_songdata;
+QueueHandle_t data_queue;
 
-static FRESULT fr;
-
-// static FRESULT f_read_from_file(FIL *this_file_struct, char *input_bytes){
-//   return f_read(this_file_struct, );
-// }
-
-// Reader tasks receives song-name over Q_songname to start reading it
-void mp3_reader_task(void *p)
+void read_task(void *parameter)
 {
-  char temp_name[16];
-  char bytes_512[512];
   while (1)
   {
-    printf("Waiting for song to receive.\n");
-    xQueueReceive(Q_songname, &temp_name[0], portMAX_DELAY);
-    strcpy(song_name, temp_name);
-    printf("Received %s.\n", song_name);
-
-    FIL *file;
-    fr = f_open(&file, &song_name[0], FA_READ);
-    printf("Opening %s.\n", song_name);
-    if (fr == FR_OK)
-    {
-      UINT byte_count = 0;
-
-      while (1)
-      {
-
-        f_read(&file, &bytes_512[0], sizeof(bytes_512), &bytes_read);
-        if (bytes_read == 0)
-        {
-          fr = f_close(&file);
-          printf("Closed %s.\n", song_name);
-          break;
-        }
-        printf("Bytes read: %d\n", bytes_read);
-        xQueueSend(Q_songdata, &bytes_512[0], portMAX_DELAY);
-        printf("%s\n", bytes_512);
-        memset(bytes_512, 0, sizeof(bytes_512));
-        byte_count += bytes_read;
-        printf("Byte count: %d\n", byte_count);
-      }
-    }
-    else
-    {
-      printf("Cannot open file\n");
-    }
+    wait_to_receive_song();
+    send_song_to_player_task();
   }
 }
 
-// Player task receives song data over Q_songdata to send it to the MP3 decoder
-// void mp3_player_task(void *p) {
-//   char bytes_512[512];
-
-//   while (1) {
-//     xQueueReceive(Q_songdata, &bytes_512[0], portMAX_DELAY);
-//     for (int i = 0; i < sizeof(bytes_512); i++) {
-//       while (mp3_decoder_needs_data) {
-//         vTaskDelay(1);
-//       }
-
-//       // spi_send_to_mp3_decoder(bytes_512[i]);
-//     }
-//   }
-// }
+// void send_file_to_mp3_decoder(void *parameter) {}
 
 void main(void)
 {
-  fprintf(stderr, "Starting FreeRTOS.\nStarting SJ2 Client.\nSJ2 Client running.\n");
   sj2_cli__init();
-  Q_songname = xQueueCreate(1, 16);
-  Q_songdata = xQueueCreate(1, 512);
+  initialize_queues();
+  printf("Starting freertos....\n");
 
-  xTaskCreate(mp3_reader_task, "Read mp3", 8192 / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
-  // xTaskCreate(mp3_player_task, "Play mp3", 4096 / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
-
+  xTaskCreate(read_task, "Reads MP3 from SD card", 4096 / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
+  // xTaskCreate(send_file_to_mp3_decoder, "Sends MP3 to MP3 decoder", 4096 / sizeof(void *), NULL, PRIORITY_HIGH,
+  // NULL);
   vTaskStartScheduler();
 }
-
 /*---------------------------------------------------------------------------------------------------*/
 // handers_general.c
 
