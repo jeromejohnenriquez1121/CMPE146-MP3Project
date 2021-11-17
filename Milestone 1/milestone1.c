@@ -1,5 +1,6 @@
-//main.c
-
+/***************************************************************************************************/
+//                                         main.c
+/***************************************************************************************************/
 #include <stdio.h>
 
 #include "FreeRTOS.h"
@@ -36,8 +37,10 @@ void main(void)
   // NULL);
   vTaskStartScheduler();
 }
-/*---------------------------------------------------------------------------------------------------*/
-// handers_general.c
+
+/***************************************************************************************************/
+//                                         handlers_general.c
+/***************************************************************************************************/
 
 extern QueueHandle_t Q_songname;
 
@@ -52,4 +55,86 @@ app_cli_status_e cli__play_song(app_cli__argument_t argument, sl_string_s user_i
 
   printf("Sent %s\n", user_input_minus_command_name.cstring);
   return APP_CLI_STATUS__SUCCESS;
+}
+
+/***************************************************************************************************/
+//                                         song.c
+/***************************************************************************************************/
+
+#include "song.h"
+
+/*------------------------------------PRIVATE FUNCTIONS------------------------------------------*/
+
+static bool file_function_succeeded() { return file_result == FR_OK; }
+
+static bool open_file(void)
+{
+  file_result = f_open(&file_struct, &song_name[0], FA_READ);
+  return file_function_succeeded();
+}
+
+static bool read_file(void)
+{
+  file_result = f_read(&file_struct, &song_data[0], sizeof(song_data), &bytes_read);
+  return file_function_succeeded();
+}
+
+static bool close_file(void)
+{
+  file_result = f_close(&file_struct);
+  return file_function_succeeded();
+}
+
+static bool eof(void) { return bytes_read == 0; }
+
+static int not_eof(void) { return 1; }
+
+/*------------------------------------PUBLIC FUNCTIONS------------------------------------------*/
+
+void initialize_queues(void)
+{
+  name_queue = xQueueCreate(1, sizeof(song_name));
+  data_queue = xQueueCreate(1, sizeof(song_data));
+}
+
+void wait_to_receive_song(void)
+{
+  char temp_name[32] = "";
+
+  printf("Waiting to receive song.\n");
+  delay__ms(1000);
+  xQueueReceive(name_queue, &temp_name[0], portMAX_DELAY);
+
+  strcpy(song_name, temp_name);
+  printf("Received %s.\n", song_name);
+  delay__ms(1000);
+}
+
+void send_song_to_player_task(void)
+{
+
+  if (open_file())
+  {
+    while (not_eof())
+    {
+      read_file();
+
+      if (eof())
+      {
+        close_file();
+        printf("Closed file.\n");
+        delay__ms(1000);
+        break;
+      }
+
+      printf("Bytes read: %d.\n", bytes_read);
+      delay__ms(1000);
+      xQueueSend(data_queue, &song_data[0], portMAX_DELAY);
+      memset(song_data, 0, sizeof(song_data));
+    }
+  }
+  else
+  {
+    printf("File not found.\n");
+  }
 }
