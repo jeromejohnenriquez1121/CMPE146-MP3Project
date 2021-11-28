@@ -51,7 +51,7 @@ app_cli_status_e cli__play_song(app_cli__argument_t argument, sl_string_s user_i
   // We tell the Queue to copy 32 bytes of songname from this location
   sl_string__erase_first_word(user_input_minus_command_name, ' ');
 
-  xQueueSend(Q_songname, &user_input_minus_command_name, portMAX_DELAY);
+  xQueueSend(Q_songname, user_input_minus_command_name.cstring, portMAX_DELAY);
 
   printf("Sent %s\n", user_input_minus_command_name.cstring);
   return APP_CLI_STATUS__SUCCESS;
