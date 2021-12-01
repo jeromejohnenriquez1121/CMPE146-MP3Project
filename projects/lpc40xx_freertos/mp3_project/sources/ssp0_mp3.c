@@ -1,5 +1,6 @@
 #include "ssp0_mp3.h"
 #include "clock.h"
+#include "lpc40xx.h"
 #include "lpc_peripherals.h"
 
 const static uint32_t cr0_dss_select_8_bit_transfer = (7 << 0);
