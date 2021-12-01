@@ -15,8 +15,7 @@ static void cli__task_list_print(sl_string_s user_input_minus_command_name,
 app_cli_status_e
 cli__uart3_transmit(app_cli__argument_t argument,
                     sl_string_s user_input_minus_command_name,
-                    app_cli__print_string_function cli_output)
-{
+                    app_cli__print_string_function cli_output) {
   uart_puts(UART__3, sl_string__c_str(user_input_minus_command_name));
 
   cli_output(NULL, "Output to UART3: ");
@@ -28,8 +27,7 @@ cli__uart3_transmit(app_cli__argument_t argument,
 
 app_cli_status_e cli__crash_me(app_cli__argument_t argument,
                                sl_string_s user_input_minus_command_name,
-                               app_cli__print_string_function cli_output)
-{
+                               app_cli__print_string_function cli_output) {
   uint32_t *bad_pointer = (uint32_t *)0x00000001;
   *bad_pointer = 0xDEADBEEF;
   return APP_CLI_STATUS__SUCCESS;
@@ -37,11 +35,9 @@ app_cli_status_e cli__crash_me(app_cli__argument_t argument,
 
 app_cli_status_e cli__task_list(app_cli__argument_t argument,
                                 sl_string_s user_input_minus_command_name,
-                                app_cli__print_string_function cli_output)
-{
+                                app_cli__print_string_function cli_output) {
   const int sleep_time = sl_string__to_int(user_input_minus_command_name);
-  if (sleep_time > 0)
-  {
+  if (sleep_time > 0) {
     vTaskResetRunTimeStats();
     vTaskDelay(sleep_time);
   }
@@ -55,8 +51,7 @@ app_cli_status_e cli__task_list(app_cli__argument_t argument,
 
 app_cli_status_e cli__play(app_cli__argument_t argument,
                            sl_string_s user_input_minus_command_name,
-                           app_cli__print_string_function cli_output)
-{
+                           app_cli__print_string_function cli_output) {
   // user_input_minus_command_name is actually a 'char *' pointer type
   // We tell the Queue to copy 32 bytes of songname from this location
   sl_string__erase_first_word(user_input_minus_command_name, ' ');
@@ -69,8 +64,7 @@ app_cli_status_e cli__play(app_cli__argument_t argument,
 
 app_cli_status_e cli__read_reg(app_cli__argument_t argument,
                                sl_string_s user_input_minus_command_name,
-                               app_cli__print_string_function cli_output)
-{
+                               app_cli__print_string_function cli_output) {
 
   sl_string__erase_first_word(user_input_minus_command_name, ' ');
 
@@ -82,8 +76,7 @@ app_cli_status_e cli__read_reg(app_cli__argument_t argument,
 }
 
 static void cli__task_list_print(sl_string_s output_string,
-                                 app_cli__print_string_function cli_output)
-{
+                                 app_cli__print_string_function cli_output) {
   void *unused_cli_param = NULL;
 
 #if (0 != configUSE_TRACE_FACILITY)
@@ -106,14 +99,11 @@ static void cli__task_list_print(sl_string_s output_string,
   cli_output(unused_cli_param, sl_string__c_str(output_string));
 
   for (unsigned priority_number = 0; priority_number < configMAX_PRIORITIES;
-       priority_number++)
-  {
+       priority_number++) {
     /* Print in sorted priority order */
-    for (unsigned i = 0; i < task_count; i++)
-    {
+    for (unsigned i = 0; i < task_count; i++) {
       const TaskStatus_t *task = &status[i];
-      if (task->uxBasePriority == priority_number)
-      {
+      if (task->uxBasePriority == priority_number) {
         total_tasks_runtime += task->ulRunTimeCounter;
 
         const unsigned cpu_percent =
