@@ -3,10 +3,10 @@
 
 #pragma once
 
-typedef enum { write_opcode = 2, read_opcode = 3 } opcode_e;
+// --------------- Read / Write Opcodes ------------- //
+typedef enum { write_opcode = 0x2, read_opcode = 0x3 } opcode_e;
 
 // -------------------- SJTwo Board Pins ----------------- //
-
 gpio_s spi_sclk_pin;
 gpio_s spi_mosi_pin;
 gpio_s spi_miso_pin;
@@ -15,7 +15,7 @@ gpio_s gpio_xdcs_pin;
 gpio_s gpio_xcs_pin;
 gpio_s gpio_dreq_pin;
 
-// --------------------- VS1053 Register Addresses ------------------- //
+// ------------------- VS1053 Register Addresses ------------------- //
 typedef enum {
   mode = 0x0,
   sci_status = 0x1,
@@ -35,6 +35,7 @@ typedef enum {
   aictrl3 = 0xF
 } sci_registers_e;
 
+// -------------- Decoder Functions ------------- //
 void decoder__initialize(void);
 
 void decoder__set_pins(void);
@@ -47,23 +48,16 @@ uint16_t decoder__read_from_sci(uint8_t address);
 
 void decoder__send_to_sdi(uint8_t byte_to_transfer);
 
-// void decoder__play_music(uint8_t data);
-// void set_sm_cancel(void);
-
 void decoder__set_reset(void);
 
 void decoder__clear_reset(void);
 
-// --------------------------------------- Decoder Chip Selects
-// ------------------------------------------- //
-
+// ------------- Decoder Chip Selects ------------ //
 void decoder__set_xcs(void);
 void decoder__clear_xcs(void);
 
 void decoder__set_xdcs(void);
 void decoder__clear_xdcs(void);
 
-// ---------------------------------------------------------------------------------------------------------
-// //
-
+// -------------- DREQ Reading Function -------------- //
 bool decoder__data_ready(void);
