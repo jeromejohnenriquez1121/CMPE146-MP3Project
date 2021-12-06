@@ -7,11 +7,12 @@
 // SPI bitmasks for binary options. Each bit mask variable has the format:
 // register_symbol_description = operation
 const static uint32_t cr0_dss_select_8_bit_transfer = (7 << 0);
+const static uint32_t cr0_dss_select_16_bit_transfer = (15 << 0);
 const static uint32_t cr1_sse_enable_ssp = (1 << 1);
 const static uint32_t sr_bsy_is_busy = (1 << 4);
 
 // Static functions
-static void set_control_registers(void);
+static void set_control_registers();
 static void set_prescalar_registers(uint32_t max_clock_mhz);
 
 /*********************************************************************************************************/
@@ -32,8 +33,7 @@ uint8_t ssp0_mp3__send_byte(uint8_t byte_to_transfer) {
   while (LPC_SSP0->SR & sr_bsy_is_busy) {
     ;
   }
-
-  return (uint8_t)LPC_SSP0->DR & 0xFF;
+  return (uint8_t)LPC_SSP0->DR;
 }
 
 /*********************************************************************************************************/

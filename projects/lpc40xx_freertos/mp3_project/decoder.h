@@ -36,7 +36,7 @@ typedef enum {
 } sci_registers_e;
 
 // -------------- Decoder Functions ------------- //
-void decoder__initialize(void);
+void decoder__initialize(uint32_t max_clock_as_mhz);
 
 void decoder__set_pins(void);
 

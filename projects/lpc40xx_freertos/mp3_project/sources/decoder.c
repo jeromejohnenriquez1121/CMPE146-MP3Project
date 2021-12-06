@@ -5,23 +5,29 @@
 #include <stdio.h>
 
 /*********************************************************************************************************/
-//                                          Public Functions //
+//                                             Declarations
 /*********************************************************************************************************/
 
-void decoder__initialize(void) {
-  const uint32_t delay_time = 100;
-  const uint32_t max_clock_mhz = 1;
+static uint32_t delay_time = 100;
 
-  decoder__set_reset();
+/*********************************************************************************************************/
+//                                          Public Functions
+/*********************************************************************************************************/
+
+void decoder__initialize(uint32_t max_clock_as_mhz) {
+  gpio__reset(gpio_reset_pin);
   delay__ms(delay_time);
-  decoder__clear_reset();
+  gpio__set(gpio_reset_pin);
   delay__ms(delay_time);
 
-  ssp0_mp3__init(max_clock_mhz);
+  ssp0_mp3__init(max_clock_as_mhz);
+  delay__ms(delay_time);
 
   decoder__send_to_sci(mode, 0x48, 0x00);
+  delay__ms(delay_time);
 
   decoder__send_to_sci(clock_freq, 0x60, 0x00);
+  delay__ms(delay_time);
 }
 
 void decoder__set_pins(void) {
@@ -53,26 +59,19 @@ void decoder__set_pins(void) {
 
 void decoder__send_to_sci(uint8_t address, uint8_t high_byte,
                           uint8_t low_byte) {
+
+  while (!decoder__data_ready()) {
+    ;
+  }
+
   decoder__set_xcs();
-  while (!decoder__data_ready()) {
-    ;
-  }
-
-  printf("Write to SCI:\n");
   ssp0_mp3__send_byte(write_opcode);
-  printf("Sent 0x%04x to SCI.\n", write_opcode);
 
-  ssp0_mp3__send_byte(address);
-  printf("Sent 0x%04x to SCI.\n", address);
-
-  ssp0_mp3__send_byte(high_byte);
-  ssp0_mp3__send_byte(low_byte);
-  printf("Sent 0x%02x%02x to SCI.\n", high_byte, low_byte);
+  decoder__clear_xcs();
 
   while (!decoder__data_ready()) {
     ;
   }
-  decoder__clear_xcs();
 }
 
 uint16_t decoder__read_from_sci(uint8_t address) {
@@ -80,17 +79,13 @@ uint16_t decoder__read_from_sci(uint8_t address) {
   uint8_t high_byte = 0x0;
   uint8_t low_byte = 0x0;
 
-  decoder__set_xcs();
-
   while (!decoder__data_ready()) {
     ;
   }
-  printf("Read from SCI:\n");
-  ssp0_mp3__send_byte(read_opcode);
-  printf("Sent 0x%04x to SCI.\n", read_opcode);
-  ssp0_mp3__send_byte(address);
-  printf("Sent 0x%04x to SCI.\n", address);
 
+  decoder__set_xcs();
+  ssp0_mp3__send_byte(read_opcode);
+  ssp0_mp3__send_byte(address);
   high_byte = ssp0_mp3__send_byte(dummy_code);
   low_byte = ssp0_mp3__send_byte(dummy_code);
 
@@ -102,18 +97,14 @@ uint16_t decoder__read_from_sci(uint8_t address) {
 
   uint16_t result = low_byte;
   result |= (high_byte << 8);
-  printf("Received 0x%04x from SCI.\n", result);
 
   return result;
 }
 
 void decoder__send_to_sdi(uint8_t byte_to_transfer) {
+
   decoder__set_xdcs();
-
-  printf("Write to SDI:\n");
   ssp0_mp3__send_byte(byte_to_transfer);
-  printf("Sent %04x to SDI.\n", byte_to_transfer);
-
   decoder__clear_xdcs();
 }
 
@@ -133,8 +124,8 @@ void decoder__clear_xdcs(void) { gpio__set(gpio_xdcs_pin); } // Set xdcs to 1
 
 // DREQ
 bool decoder__data_ready(void) {
-  return gpio__get(gpio_dreq_pin);
-} // Gets input from dreq
+  return gpio__get(gpio_dreq_pin); // Gets input from dreq
+}
 
 void decoder__get_status(void) {
   uint16_t mode_reading = decoder__read_from_sci(mode);
