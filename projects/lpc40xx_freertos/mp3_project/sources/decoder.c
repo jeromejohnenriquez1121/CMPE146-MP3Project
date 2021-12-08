@@ -24,10 +24,8 @@ void decoder__initialize(uint32_t max_clock_as_mhz) {
   delay__ms(delay_time);
 
   decoder__send_to_sci(mode, 0x48, 0x00);
-  delay__ms(delay_time);
 
   decoder__send_to_sci(clock_freq, 0x60, 0x00);
-  delay__ms(delay_time);
 }
 
 void decoder__set_pins(void) {
@@ -59,29 +57,22 @@ void decoder__set_pins(void) {
 
 void decoder__send_to_sci(uint8_t address, uint8_t high_byte,
                           uint8_t low_byte) {
-
-  while (!decoder__data_ready()) {
-    ;
-  }
-
   decoder__set_xcs();
   ssp0_mp3__send_byte(write_opcode);
-
-  decoder__clear_xcs();
+  ssp0_mp3__send_byte(address);
+  ssp0_mp3__send_byte(high_byte);
+  ssp0_mp3__send_byte(low_byte);
 
   while (!decoder__data_ready()) {
     ;
   }
+  decoder__clear_xcs();
 }
 
 uint16_t decoder__read_from_sci(uint8_t address) {
   const uint8_t dummy_code = 0xFF;
   uint8_t high_byte = 0x0;
   uint8_t low_byte = 0x0;
-
-  while (!decoder__data_ready()) {
-    ;
-  }
 
   decoder__set_xcs();
   ssp0_mp3__send_byte(read_opcode);
@@ -106,6 +97,10 @@ void decoder__send_to_sdi(uint8_t byte_to_transfer) {
   decoder__set_xdcs();
   ssp0_mp3__send_byte(byte_to_transfer);
   decoder__clear_xdcs();
+
+  while (!decoder__data_ready()) {
+    ;
+  }
 }
 
 //----------------------- Pin Functions -------------------------- //
@@ -130,6 +125,8 @@ bool decoder__data_ready(void) {
 void decoder__get_status(void) {
   uint16_t mode_reading = decoder__read_from_sci(mode);
   uint16_t status_reading = decoder__read_from_sci(sci_status);
+  uint16_t clock_freq_reading = decoder__read_from_sci(clock_freq);
   printf("Mode: %04x.\n", mode_reading);
   printf("Status: %04x.\n", status_reading);
+  printf("Clock frequency: %04x.\n", clock_freq_reading);
 }

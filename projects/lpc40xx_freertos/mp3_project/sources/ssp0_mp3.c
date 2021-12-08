@@ -7,7 +7,6 @@
 // SPI bitmasks for binary options. Each bit mask variable has the format:
 // register_symbol_description = operation
 const static uint32_t cr0_dss_select_8_bit_transfer = (7 << 0);
-const static uint32_t cr0_dss_select_16_bit_transfer = (15 << 0);
 const static uint32_t cr1_sse_enable_ssp = (1 << 1);
 const static uint32_t sr_bsy_is_busy = (1 << 4);
 

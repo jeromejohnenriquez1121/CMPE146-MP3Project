@@ -15,6 +15,9 @@
 #include "ssp0_mp3.h"
 #include "string.h"
 
+// To enable debugging, use non-zero value:
+#define DEBUGGING_ENABLED 0
+
 /**************************************************************************/
 //                    Variable and Function Declarations
 /**************************************************************************/
@@ -83,6 +86,10 @@ int main(void) {
   initialize_queues();
 
   delay__ms(delay_time);
+
+#if DEBUGGING_ENABLED
+  decoder__get_status();
+#endif
 
   xTaskCreate(reader_task, "Reads file from SD card", 4096 / sizeof(void *),
               NULL, PRIORITY_LOW, NULL);
