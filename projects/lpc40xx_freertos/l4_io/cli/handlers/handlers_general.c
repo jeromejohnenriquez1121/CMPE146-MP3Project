@@ -7,7 +7,7 @@
 #include "decoder.h"
 #include "uart_printf.h"
 
-extern QueueHandle_t name_queue;
+extern QueueHandle_t song_name_queue;
 
 static void cli__task_list_print(sl_string_s user_input_minus_command_name,
                                  app_cli__print_string_function cli_output);
@@ -56,22 +56,10 @@ app_cli_status_e cli__play(app_cli__argument_t argument,
   // We tell the Queue to copy 32 bytes of songname from this location
   sl_string__erase_first_word(user_input_minus_command_name, ' ');
 
-  xQueueSend(name_queue, user_input_minus_command_name.cstring, portMAX_DELAY);
+  xQueueSend(song_name_queue, user_input_minus_command_name.cstring,
+             portMAX_DELAY);
 
   printf("Sent %s\n", user_input_minus_command_name.cstring);
-  return APP_CLI_STATUS__SUCCESS;
-}
-
-app_cli_status_e cli__read_reg(app_cli__argument_t argument,
-                               sl_string_s user_input_minus_command_name,
-                               app_cli__print_string_function cli_output) {
-
-  sl_string__erase_first_word(user_input_minus_command_name, ' ');
-
-  uint16_t result =
-      decoder__read_from_sci(user_input_minus_command_name.cstring);
-  printf("Status of address %s: %x", user_input_minus_command_name.cstring,
-         result);
   return APP_CLI_STATUS__SUCCESS;
 }
 

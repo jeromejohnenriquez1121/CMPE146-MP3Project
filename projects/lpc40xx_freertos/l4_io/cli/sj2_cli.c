@@ -46,11 +46,6 @@ void sj2_cli__init(void) {
           "window.",
       .app_cli_handler = cli__task_list};
 
-  static app_cli__command_s read_reg = {
-      .command_name = "read_reg",
-      .help_message_for_command = "Read register from VS1053 decoder board.\n",
-      .app_cli_handler = cli__read_reg};
-
   static app_cli__command_s play = {.command_name = "play",
                                     .help_message_for_command =
                                         "Play song from SD card",
@@ -63,7 +58,6 @@ void sj2_cli__init(void) {
   app_cli__add_command_handler(&sj2_cli_struct, &i2c);
   app_cli__add_command_handler(&sj2_cli_struct, &crash);
   app_cli__add_command_handler(&sj2_cli_struct, &play);
-  app_cli__add_command_handler(&sj2_cli_struct, &read_reg);
 
   // In case other tasks are hogging the CPU, it would be useful to run the CLI
   // at high priority to at least be able to see what is going on
