@@ -18,8 +18,12 @@
 
 QueueHandle_t song_name_queue;
 QueueHandle_t song_data_queue;
+QueueHandle_t pause_q;
+QueueHandle_t play_q;
 
 QueueHandle_t button_control_q;
+
+bool is_paused;
 
 FIL file;
 FRESULT fresult;
@@ -51,6 +55,9 @@ void reader_task(void *parameter) {
           f_close(&file);
           break;
         } else {
+          while (is_paused) {
+            vTaskDelay(5);
+          }
           xQueueSend(song_data_queue, &song_data[0], portMAX_DELAY);
         }
       }
@@ -67,6 +74,7 @@ void player_task(void *parameter) {
         while (!decoder__data_ready()) {
           ;
         }
+
         decoder__send_to_sdi(song_data[i]);
       }
     }
@@ -76,6 +84,7 @@ void player_task(void *parameter) {
 void detect_input_buttons(void *parameter) {
   uint8_t raise_volume_action = 1;
   uint8_t lower_volume_action = 2;
+  uint8_t pause_action = 5;
 
   while (1) {
     if (!gpio__get(gpio_up_button)) {
@@ -89,6 +98,12 @@ void detect_input_buttons(void *parameter) {
         ;
       }
       xQueueSend(button_control_q, &lower_volume_action, 0);
+    }
+    if (!gpio__get(gpio_pause_button)) {
+      while (!gpio__get(gpio_pause_button)) {
+        ;
+      }
+      xQueueSend(button_control_q, &pause_action, 0);
     }
   }
 }
@@ -105,6 +120,16 @@ void button_controls(void *parameter) {
       if (button_action == 2) {
         decoder__lower_volume();
       }
+      if (button_action == 5) {
+        if (is_paused) {
+          is_paused = false;
+          printf("Play\n");
+
+        } else {
+          is_paused = true;
+          printf("Paused\n");
+        }
+      }
     }
   }
 }
@@ -117,6 +142,8 @@ int main(void) {
   initialize_queues();
 
   delay__ms(delay_time);
+
+  is_paused = true;
 
   xTaskCreate(reader_task, "Reads file from SD card", 4096 / sizeof(void *),
               NULL, PRIORITY_LOW, NULL);
@@ -146,4 +173,6 @@ static void initialize_queues(void) {
   song_name_queue = xQueueCreate(1, 32);
   song_data_queue = xQueueCreate(1, 512);
   button_control_q = xQueueCreate(1, sizeof(uint8_t));
+  pause_q = xQueueCreate(1, sizeof(uint8_t));
+  play_q = xQueueCreate(1, sizeof(bool));
 }

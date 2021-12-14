@@ -17,7 +17,7 @@ gpio_s gpio_dreq_pin;
 
 gpio_s gpio_up_button;
 gpio_s gpio_down_button;
-gpio_s gpio_mode_button;
+gpio_s gpio_pause_button;
 // ------------------- VS1053 Register Addresses ------------------- //
 typedef enum {
   mode = 0x0,
@@ -54,6 +54,8 @@ void decoder__send_to_sdi(uint8_t byte_to_transfer);
 void decoder__set_reset(void);
 
 void decoder__clear_reset(void);
+
+void decoder__pause(void);
 
 // ------------- Decoder Chip Selects ------------ //
 void decoder__set_xcs(void);

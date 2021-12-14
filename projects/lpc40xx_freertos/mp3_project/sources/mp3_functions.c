@@ -4,11 +4,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
-const static uint16_t initial_volume_high_byte = 0x88;
-const static uint16_t initial_volume_low_byte = 0x88;
-const static uint16_t volume_setting = 0x1111;
-
-static void change_volume(uint16_t volume_setting);
+const static uint16_t initial_volume_high_byte = 0x11;
+const static uint16_t initial_volume_low_byte = 0x11;
 
 /**************************************************************************/
 //                    Variable and Function Declarations
@@ -48,14 +45,3 @@ bool mp3_functions__lower_volume(void) {
 }
 
 uint16_t get_current_volume(void) { return current_volume; }
-
-/**************************************************************************/
-//                            Private Functions
-/**************************************************************************/
-
-static void change_volume(uint16_t this_volume_setting) {
-  uint8_t high_byte = (this_volume_setting >> 8) & 0xFF;
-  uint8_t low_byte = this_volume_setting & 0xFF;
-
-  decoder__send_to_sci(volume_ctl, high_byte, low_byte);
-}

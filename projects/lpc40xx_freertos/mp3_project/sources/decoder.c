@@ -1,15 +1,23 @@
+#include "FreeRTOS.h"
+
 #include "decoder.h"
 #include "delay.h"
 #include "lpc40xx.h"
 #include "mp3_functions.h"
+#include "queue.h"
+#include "semphr.h"
 #include "ssp0_mp3.h"
 #include <stdbool.h>
 #include <stdio.h>
 
-#define DEBUG_ENABLE 0
+#define DEBUG_ENABLE 1
+
+QueueHandle_t pause_q;
+QueueHandle_t play_q;
 
 static uint32_t delay_time = 100;
 
+static bool is_paused = false;
 /*********************************************************************************************************/
 //                                          Public Functions
 /*********************************************************************************************************/
@@ -56,7 +64,7 @@ void decoder__set_pins(void) {
   gpio_up_button = gpio__construct_with_function(2, 0, GPIO__FUNCITON_0_IO_PIN);
   gpio_down_button =
       gpio__construct_with_function(2, 1, GPIO__FUNCITON_0_IO_PIN);
-  gpio_mode_button =
+  gpio_pause_button =
       gpio__construct_with_function(2, 2, GPIO__FUNCITON_0_IO_PIN);
 
   // Set GPIO as output
@@ -68,7 +76,7 @@ void decoder__set_pins(void) {
   gpio__set_as_input(gpio_dreq_pin);
   gpio__set_as_input(gpio_up_button);
   gpio__set_as_input(gpio_down_button);
-  gpio__set_as_input(gpio_mode_button);
+  gpio__set_as_input(gpio_pause_button);
 
   // Set GPIO output
   gpio__set(gpio_xdcs_pin);
@@ -143,6 +151,26 @@ void decoder__lower_volume(void) {
     printf("Lower volume SUCCESS: %04x.\n", decoder__read_from_sci(volume_ctl));
   else
     printf("Lower volume FAIL.\n");
+#endif
+}
+
+void decoder__pause(void) {
+  uint8_t byte = 0;
+
+  if (is_paused) {
+    is_paused = false;
+    xQueueSend(play_q, &byte, 0);
+  } else {
+    is_paused = true;
+    xQueueSend(pause_q, &byte, 0);
+  }
+
+#if DEBUG_ENABLE
+  if (is_paused) {
+    printf("Play song.\n");
+  } else {
+    printf("Pause song.\n");
+  }
 #endif
 }
 
