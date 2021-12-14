@@ -9,21 +9,17 @@
 #include "decoder.h"
 #include "delay.h"
 #include "ff.h"
+#include "gpio.h"
 #include "periodic_scheduler.h"
 #include "queue.h"
 #include "sj2_cli.h"
 #include "ssp0_mp3.h"
 #include "string.h"
 
-// To enable debugging, use non-zero value:
-#define DEBUGGING_ENABLED 0
-
-/**************************************************************************/
-//                    Variable and Function Declarations
-/**************************************************************************/
-
 QueueHandle_t song_name_queue;
 QueueHandle_t song_data_queue;
+
+QueueHandle_t button_control_q;
 
 FIL file;
 FRESULT fresult;
@@ -41,6 +37,7 @@ static void initialize_queues(void);
 /**************************************************************************/
 
 void reader_task(void *parameter) {
+
   char song_name[32];
   char song_data[512];
 
@@ -76,10 +73,44 @@ void player_task(void *parameter) {
   }
 }
 
+void detect_input_buttons(void *parameter) {
+  uint8_t raise_volume_action = 1;
+  uint8_t lower_volume_action = 2;
+
+  while (1) {
+    if (!gpio__get(gpio_up_button)) {
+      while (!gpio__get(gpio_up_button)) {
+        ;
+      }
+      xQueueSend(button_control_q, &raise_volume_action, 0);
+    }
+    if (!gpio__get(gpio_down_button)) {
+      while (!gpio__get(gpio_down_button)) {
+        ;
+      }
+      xQueueSend(button_control_q, &lower_volume_action, 0);
+    }
+  }
+}
+
+void button_controls(void *parameter) {
+  uint8_t button_action;
+
+  while (1) {
+    button_action = 0;
+    if (xQueueReceive(button_control_q, &button_action, portMAX_DELAY)) {
+      if (button_action == 1) {
+        decoder__raise_volume();
+      }
+      if (button_action == 2) {
+        decoder__lower_volume();
+      }
+    }
+  }
+}
+
 int main(void) {
   sj2_cli__init();
-
-  decoder__set_pins();
 
   decoder__initialize(spi_clock_freq_in_mhz);
 
@@ -87,14 +118,14 @@ int main(void) {
 
   delay__ms(delay_time);
 
-#if DEBUGGING_ENABLED
-  decoder__get_status();
-#endif
-
   xTaskCreate(reader_task, "Reads file from SD card", 4096 / sizeof(void *),
               NULL, PRIORITY_LOW, NULL);
   xTaskCreate(player_task, "Sends files to decoder", 4096 / sizeof(void *),
               NULL, PRIORITY_HIGH, NULL);
+  xTaskCreate(detect_input_buttons, "Detects button pressed",
+              4096 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  xTaskCreate(button_controls, "Play button functions", 4096 / sizeof(void *),
+              NULL, PRIORITY_LOW, NULL);
 
   vTaskStartScheduler();
 
@@ -114,4 +145,5 @@ static bool is_eof(void) { return bytes_read == 0; }
 static void initialize_queues(void) {
   song_name_queue = xQueueCreate(1, 32);
   song_data_queue = xQueueCreate(1, 512);
+  button_control_q = xQueueCreate(1, sizeof(uint8_t));
 }
