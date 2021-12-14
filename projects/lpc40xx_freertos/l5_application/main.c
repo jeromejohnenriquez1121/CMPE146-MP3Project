@@ -55,6 +55,9 @@ void reader_task(void *parameter) {
           f_close(&file);
           break;
         } else {
+          while (is_paused) {
+            vTaskDelay(5);
+          }
           xQueueSend(song_data_queue, &song_data[0], portMAX_DELAY);
         }
       }
@@ -70,10 +73,6 @@ void player_task(void *parameter) {
       for (int i = 0; i < sizeof(song_data); i++) {
         while (!decoder__data_ready()) {
           ;
-        }
-
-        while (is_paused) {
-          vTaskDelay(5);
         }
 
         decoder__send_to_sdi(song_data[i]);
@@ -144,7 +143,7 @@ int main(void) {
 
   delay__ms(delay_time);
 
-  is_paused = false;
+  is_paused = true;
 
   xTaskCreate(reader_task, "Reads file from SD card", 4096 / sizeof(void *),
               NULL, PRIORITY_LOW, NULL);
