@@ -15,6 +15,9 @@ gpio_s gpio_xdcs_pin;
 gpio_s gpio_xcs_pin;
 gpio_s gpio_dreq_pin;
 
+gpio_s gpio_up_button;
+gpio_s gpio_down_button;
+gpio_s gpio_mode_button;
 // ------------------- VS1053 Register Addresses ------------------- //
 typedef enum {
   mode = 0x0,
@@ -61,3 +64,7 @@ void decoder__clear_xdcs(void);
 
 // -------------- DREQ Reading Function -------------- //
 bool decoder__data_ready(void);
+
+// -------------- Volume Functions -------------- //
+void decoder__raise_volume(void);
+void decoder__lower_volume(void);

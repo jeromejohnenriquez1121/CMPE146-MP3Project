@@ -1,12 +1,12 @@
 #include "decoder.h"
 #include "delay.h"
+#include "lpc40xx.h"
+#include "mp3_functions.h"
 #include "ssp0_mp3.h"
 #include <stdbool.h>
 #include <stdio.h>
 
-/*********************************************************************************************************/
-//                                             Declarations
-/*********************************************************************************************************/
+#define DEBUG_ENABLE 0
 
 static uint32_t delay_time = 100;
 
@@ -23,9 +23,19 @@ void decoder__initialize(uint32_t max_clock_as_mhz) {
   ssp0_mp3__init(max_clock_as_mhz);
   delay__ms(delay_time);
 
+  decoder__set_pins();
+
   decoder__send_to_sci(mode, 0x48, 0x00);
 
   decoder__send_to_sci(clock_freq, 0x60, 0x00);
+
+  mp3_functions__init_volume();
+
+  mp3_functions__init_mode();
+
+#if DEBUG_ENABLE
+  decoder__get_status();
+#endif
 }
 
 void decoder__set_pins(void) {
@@ -43,11 +53,22 @@ void decoder__set_pins(void) {
   gpio_xcs_pin = gpio__construct_with_function(2, 7, GPIO__FUNCITON_0_IO_PIN);
   gpio_dreq_pin = gpio__construct_with_function(2, 8, GPIO__FUNCITON_0_IO_PIN);
 
-  // Set GPIO pin direction
+  gpio_up_button = gpio__construct_with_function(2, 0, GPIO__FUNCITON_0_IO_PIN);
+  gpio_down_button =
+      gpio__construct_with_function(2, 1, GPIO__FUNCITON_0_IO_PIN);
+  gpio_mode_button =
+      gpio__construct_with_function(2, 2, GPIO__FUNCITON_0_IO_PIN);
+
+  // Set GPIO as output
   gpio__set_as_output(gpio_reset_pin);
   gpio__set_as_output(gpio_xcs_pin);
   gpio__set_as_output(gpio_xdcs_pin);
+
+  // Set GPIO as input
   gpio__set_as_input(gpio_dreq_pin);
+  gpio__set_as_input(gpio_up_button);
+  gpio__set_as_input(gpio_down_button);
+  gpio__set_as_input(gpio_mode_button);
 
   // Set GPIO output
   gpio__set(gpio_xdcs_pin);
@@ -103,6 +124,28 @@ void decoder__send_to_sdi(uint8_t byte_to_transfer) {
   }
 }
 
+void decoder__raise_volume(void) {
+  bool result = mp3_functions__raise_volume();
+
+#if DEBUG_ENABLE
+  if (result == true)
+    printf("Raise volume SUCCESS: %04x.\n", decoder__read_from_sci(volume_ctl));
+  else
+    printf("Raise volume FAIL.\n");
+#endif
+}
+
+void decoder__lower_volume(void) {
+  bool result = mp3_functions__lower_volume();
+
+#if DEBUG_ENABLE
+  if (result == true)
+    printf("Lower volume SUCCESS: %04x.\n", decoder__read_from_sci(volume_ctl));
+  else
+    printf("Lower volume FAIL.\n");
+#endif
+}
+
 //----------------------- Pin Functions -------------------------- //
 
 // RESET
@@ -126,7 +169,9 @@ void decoder__get_status(void) {
   uint16_t mode_reading = decoder__read_from_sci(mode);
   uint16_t status_reading = decoder__read_from_sci(sci_status);
   uint16_t clock_freq_reading = decoder__read_from_sci(clock_freq);
+  uint16_t volume_reading = decoder__read_from_sci(volume_ctl);
   printf("Mode: %04x.\n", mode_reading);
   printf("Status: %04x.\n", status_reading);
   printf("Clock frequency: %04x.\n", clock_freq_reading);
+  printf("Volume: %04x.\n", volume_reading);
 }
