@@ -1,15 +1,23 @@
 #include "mp3_functions.h"
+#include "FreeRTOS.h"
 #include "decoder.h"
+#include "ff.h"
+#include "queue.h"
+#include "song_list.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+
+QueueHandle_t song_name_queue;
 
 const static uint16_t initial_volume_high_byte = 0x22;
 const static uint16_t initial_volume_low_byte = 0x22;
 
 /**************************************************************************/
-//                    Variable and Function Declarations
+//                          Public Functions
 /**************************************************************************/
+
+// ------------ Volume Functions ---------- //
 
 void mp3_functions__init_volume(void) {
   decoder__send_to_sci(sci_volume_ctl, initial_volume_high_byte,
@@ -45,8 +53,6 @@ bool mp3_functions__lower_volume(void) {
   return true;
 }
 
-int mp3_functions__get_mode(void) { return current_mode; }
-
 char mp3_functions__get_current_volume(void) {
   uint8_t this_current_volume = decoder__read_from_sci(sci_volume_ctl) & 0xF;
   printf("%x\n", this_current_volume);
@@ -77,6 +83,8 @@ char mp3_functions__get_current_volume(void) {
   return volume;
 }
 
+// ------------ Mode Functions ---------- //
+
 void mp3_functions__scroll_through_modes() {
   if (current_mode == pause_mode) {
     current_mode = volume_mode;
@@ -91,18 +99,60 @@ void mp3_functions__scroll_through_modes() {
   }
 }
 
-void mp3_functions__toggle_pause(bool *pause_var) {
-  if (*pause_var == true) {
-    *pause_var = false;
-  } else {
-    *pause_var = true;
-  }
-}
+//---------------- Play and Pauses Functions ----------------------- //
 
 void mp3_functions__enable_pause(bool *pause_var) { *pause_var = true; }
 
-
 void mp3_functions__disable_pause(bool *pause_var) { *pause_var = false; }
 
-void mp3_functions__rewind(void);
-void mp3_functions__skip(void);
+//-------------- Adjust Bass and Treble Functions ---------- //
+
+void mp3_functions__raise_bass(void) {
+  uint8_t this_current_bass_level =
+      (decoder__read_from_sci(sci_bass) >> 4) & 0xF;
+  uint8_t new_bass_level = 0x0;
+
+  if (this_current_bass_level > 0xE || this_current_bass_level < 0x2) {
+    new_bass_level = 0xF;
+  } else {
+    new_bass_level -= (this_current_bass_level + 0x3) << 4;
+  }
+
+  decoder__send_to_sci(sci_bass, 0x0, new_bass_level);
+}
+void mp3_functions__lower_bass(void) {
+  uint8_t this_current_bass_level =
+      (decoder__read_from_sci(sci_bass) >> 4) & 0xF;
+  uint8_t new_bass_level = 0x0;
+
+  if (this_current_bass_level < 0 || this_current_bass_level > 0xD) {
+    new_bass_level = 0x0;
+  } else {
+    new_bass_level -= (this_current_bass_level - 0x3) << 4;
+  }
+
+  decoder__send_to_sci(sci_bass, 0x0, new_bass_level);
+}
+
+void mp3_functions__raise_treble(void) {
+  uint8_t this_current_treble_level =
+      (decoder__read_from_sci(sci_bass >> 12) & 0xF);
+  uint8_t this_new_treble_level = 0x0;
+
+  if (this_current_treble_level > 0xE || this_current_treble_level < 0x2) {
+    this_new_treble_level = 0xF;
+  } else {
+    this_new_treble_level = (this_current_treble_level + 0x3) << 12;
+  }
+}
+void mp3_functions__lower_treble(void) {
+  uint8_t this_current_treble_level =
+      (decoder__read_from_sci(sci_bass >> 12) & 0xF);
+  uint8_t this_new_treble_level = 0x0;
+
+  if (this_current_treble_level > 0xE || this_current_treble_level < 0x2) {
+    this_new_treble_level = 0xF;
+  } else {
+    this_new_treble_level = (this_current_treble_level + 0x3) << 12;
+  }
+}

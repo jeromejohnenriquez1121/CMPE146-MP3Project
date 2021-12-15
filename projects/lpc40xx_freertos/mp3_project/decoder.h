@@ -1,3 +1,4 @@
+#include "ff.h"
 #include "gpio.h"
 #include <stdint.h>
 
@@ -60,6 +61,14 @@ void decoder__change_mode(void);
 void decoder__pause(bool *pause_var);
 
 void decoder__play(bool *pause_var);
+
+void decoder__raise_bass(void);
+void decoder__lower_bass(void);
+void decoder__raise_treble(void);
+void decoder__lower_treble(void);
+
+// void decoder__rewind(UINT *br, size_t *song_index, FIL *file);
+// void decoder__skip(UINT *br, size_t *song_index, FIL *file);
 
 // ------------- Decoder Chip Selects ------------ //
 void decoder__set_xcs(void);

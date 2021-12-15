@@ -1,4 +1,3 @@
-
 #include "LCD.h"
 #include "FreeRTOS.h"
 #include "clock.h"
@@ -6,6 +5,7 @@
 #include "ff.h"
 #include "gpio.h"
 #include "queue.h"
+#include "string.h"
 #include "uart.h"
 #include <stdbool.h>
 #include <stdio.h>
@@ -37,6 +37,8 @@ void lcd__init(void) {
   uart__init(UART__2, clock__get_peripheral_clock_hz(), lcd_baud_rate);
 
   uart__enable_queues(UART__2, queue_receive, queue_transmit);
+
+  lcd__backlight_max();
 }
 
 void lcd__clear_screen(void) {
@@ -99,6 +101,8 @@ void lcd__menu_task(void *parameter) {
   int listN = 1;
   int option = 2;
 
+  uint8_t button_action;
+
   while (1) {
 
     if (menu == playN) {
@@ -115,19 +119,17 @@ void lcd__menu_task(void *parameter) {
       }
 
       lcd__set_cursor_end_first_line();
-
-      while (menu == playN) {
-        if (gpio0__get_level(downN)) {
+      if (xQueueRecieve(button_control_q, &button_action, portMAX_DELAY)) {
+        if (button_action == 1) {
+          vTaskDelay(500);
+          menu = 2;
+        }
+        if (button_action == 2) {
           vTaskDelay(500);
           menu++;
         }
-
-        else if (gpio0__get_level(upN)) {
-          vTaskDelay(500);
-          menu = 2;
-        } else if (gpio1__get_level(selectN)) {
+        if (button_action == 3) {
           lcd__play_select();
-          break;
         }
       }
     }
@@ -147,17 +149,18 @@ void lcd__menu_task(void *parameter) {
 
       lcd__set_cursor_end_first_line();
 
-      while (menu == listN) {
-        if (gpio0__get_level(downN)) {
+      if (xQueueRecieve(button_control_q, &button_action, portMAX_DELAY)) {
+        if (button_action == 2) {
 
           vTaskDelay(500);
           menu++;
         }
 
-        else if (gpio0__get_level(upN)) {
+        else if (button_action == 1) {
           vTaskDelay(500);
           menu--;
-        } else if (gpio1__get_level(selectN)) {
+        } else if (button_action == 3) {
+          vTaskDelay(500);
           lcd__list_select();
         }
       }
@@ -178,26 +181,29 @@ void lcd__menu_task(void *parameter) {
 
       lcd__set_cursor_first_line();
 
-      while (menu == option) {
-        if (gpio0__get_level(downN)) {
+      if (xQueueRecieve(button_control_q, &button_action, portMAX_DELAY)) {
+        if (button_action == 2) {
           vTaskDelay(500);
           menu = 0;
         }
 
-        else if (gpio0__get_level(upN)) {
+        else if (button_action == 1) {
           vTaskDelay(500);
           menu--;
+        } else if (button_action == 3) {
+          vTaskDelay(500);
+          options_select();
         }
       }
     }
   }
 }
 
-void play_select(void) { /* return later */
+void lcd__play_select(void) { /* return later */
 }
 
-void options_select() {
-  char volume[] = {'0', '1', '2',  '3',  '4',  '5',  '6',
+void lcd__options_select() {
+  char volume[] = {'0', '1', '2', '3',  '4',  '5',  '6',
                    '7', '8', '9', '10', '11', '12', '13'};
   char bass[] = "Bass";
   char treble[] = "Treble";
@@ -207,9 +213,10 @@ void options_select() {
     lcd__set_cursor_first_line();
 
     if (current_mode == volume_mode) {
-      int volume_index = mp3_functions__get_current_volume;
-      lcd__uart_print(volume[volume_index]);
+      char volume_index = mp3_functions__get_current_volume();
+      lcd__uart_print(volume_index);
       lcd__uart_print(':');
+      lcd__uart_print(6);
 
     } else if (mode == 1) {
       for (int i = 0; i < sizeof(bass) - 1; i++) {
@@ -225,20 +232,7 @@ void options_select() {
       }
       lcd__uart_print(':');
       /*return later
-      UARTprint(get value for treble() )
 
-      if(gpio(downN))
-      {
-                      set value for treble -1
-      }
-      if(gpio(upN))
-      {
-                              set value for treble +1
-      }
-      if(gpio(selectB))
-      {
-                      mode=0;
-      }
        */
     }
   }
@@ -260,21 +254,7 @@ void lcd__list_select(void) {
     fprintf(stderr, "%d song:", count / 2);
     fprintf(stderr, song_list__get_name_for_item(count));
     fprintf(stderr, "\n");
-#endif
-
-    while (1) {
-      if (gpio0__get_level(downN)) {
-        vTaskDelay(500);
-        count = count + 2;
-        break;
-      } else if (gpio0__get_level(upN)) {
-        vTaskDelay(500);
-        count = count - 2;
-        break;
-      } else if (gpio1__get_level(selectN)) {
-        /*return later */
-      }
-    }
+#endi
 
     if (count > number_of_songs - 2) {
       count = 0;
@@ -286,7 +266,7 @@ void lcd__list_select(void) {
   }
 }
 
-void print_song(int song) {
+void lcd__print_song(int song) {
   char *songname;
   songname = song_list__get_name_for_item(song);
 
@@ -296,6 +276,16 @@ void print_song(int song) {
     }
     if (songname[i] == '.') {
       break;
+    }
+  }
+}
+
+void lcd__print_song_string(char *song) {
+  size_t song_name_length = strlen(song);
+
+  for (int i = 0; i < song_name_length; i++) {
+    if (song[i] != '.') {
+      lcd__uart_print(song[i]);
     }
   }
 }

@@ -3,10 +3,12 @@
 #include "LCD.h"
 #include "decoder.h"
 #include "delay.h"
+#include "ff.h"
 #include "lpc40xx.h"
 #include "mp3_functions.h"
 #include "queue.h"
 #include "semphr.h"
+#include "song_list.h"
 #include "ssp0_mp3.h"
 #include <stdbool.h>
 #include <stdio.h>
@@ -27,19 +29,26 @@ void decoder__initialize(uint32_t max_clock_as_mhz) {
   delay__ms(delay_time);
   gpio__set(gpio_reset_pin);
   delay__ms(delay_time);
+  printf("a\n");
 
   ssp0_mp3__init(max_clock_as_mhz);
   delay__ms(delay_time);
+  printf("a\n");
 
   decoder__set_pins();
+  printf("a\n");
 
   decoder__send_to_sci(sci_mode, 0x48, 0x00);
+  printf("a\n");
 
   decoder__send_to_sci(sci_clock_freq, 0x60, 0x00);
+  printf("a\n");
 
   mp3_functions__init_volume();
+  printf("a\n");
 
   mp3_functions__init_mode();
+  printf("a\n");
 
   // lcd__init();
 
@@ -85,6 +94,8 @@ void decoder__set_pins(void) {
   gpio__set(gpio_xcs_pin);
   gpio__set(gpio_reset_pin);
 }
+
+//----------------------- SCI and SDI Functions -------------------------- //
 
 void decoder__send_to_sci(uint8_t address, uint8_t high_byte,
                           uint8_t low_byte) {
@@ -134,10 +145,13 @@ void decoder__send_to_sdi(uint8_t byte_to_transfer) {
   }
 }
 
-void decoder__pause(bool *pause_var) { mp3_functions__enable_pause(pause_var); }
+//----------------------- Play and Pauses Functions --------------------------
+////
 
+void decoder__pause(bool *pause_var) { mp3_functions__enable_pause(pause_var); }
 void decoder__play(bool *pause_var) { mp3_functions__disable_pause(pause_var); }
 
+//----------------------- Volume Functions -------------------------- //
 void decoder__raise_volume(void) {
   bool result = mp3_functions__raise_volume();
 
@@ -200,4 +214,36 @@ void decoder__get_status(void) {
   printf("Status: %04x.\n", status_reading);
   printf("Clock frequency: %04x.\n", clock_freq_reading);
   printf("Volume: %04x.\n", volume_reading);
+}
+
+//----------------------- Bass and Treble Level Functions
+//-------------------------- //
+
+void decoder__raise_bass(void) {
+  mp3_functions__raise_bass();
+
+#if DEBUG_ENABLE
+  printf("Bass Register: %04x\n.", decoder__read_from_sci(sci_bass));
+#endif
+}
+void decoder__lower_bass(void) {
+  mp3_functions__lower_bass();
+
+#if DEBUG_ENABLE
+  printf("Bass Register: %04x\n.", decoder__read_from_sci(sci_bass));
+#endif
+}
+void decoder__raise_treble(void) {
+  mp3_functions__raise_treble();
+
+#if DEBUG_ENABLE
+  printf("Bass Register: %04x\n.", decoder__read_from_sci(sci_bass));
+#endif
+}
+void decoder__lower_treble(void) {
+  mp3_functions__lower_treble();
+
+#if DEBUG_ENABLE
+  printf("Bass Register: %04x\n.", decoder__read_from_sci(sci_bass));
+#endif
 }

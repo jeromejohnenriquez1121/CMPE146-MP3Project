@@ -4,6 +4,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
+#include "LCD.h"
 #include "board_io.h"
 #include "common_macros.h"
 #include "decoder.h"
@@ -14,6 +15,7 @@
 #include "periodic_scheduler.h"
 #include "queue.h"
 #include "sj2_cli.h"
+#include "song_list.h"
 #include "ssp0_mp3.h"
 #include "string.h"
 
@@ -25,6 +27,8 @@ QueueHandle_t play_q;
 QueueHandle_t button_control_q;
 
 bool is_paused;
+bool is_skip;
+bool is_rewind;
 
 FIL file;
 FRESULT fresult;
@@ -34,8 +38,11 @@ static int not_eof(void);
 static bool is_eof(void);
 static uint32_t delay_time = 100;
 static uint32_t spi_clock_freq_in_mhz = 1;
+size_t song_list_index;
 
 static void initialize_queues(void);
+static void rewind_song(void);
+static void skip_song(void);
 
 /**************************************************************************/
 //                            Public Functions
@@ -49,11 +56,14 @@ void reader_task(void *parameter) {
   while (1) {
     xQueueReceive(song_name_queue, &song_name[0], portMAX_DELAY);
 
+    lcd__print_song_string(&song_name[0]);
+
     if (f_open(&file, &song_name[0], FA_READ) == FR_OK) {
       while (not_eof()) {
         f_read(&file, &song_data[0], sizeof(song_data), &bytes_read);
         if (is_eof()) {
           f_close(&file);
+          skip_song();
           break;
         } else {
           while (is_paused) {
@@ -116,58 +126,75 @@ void button_controls(void *parameter) {
     button_action = 0;
     if (xQueueReceive(button_control_q, &button_action, portMAX_DELAY)) {
       if (button_action == 1) {
-        if (current_mode == menu_mode) {
+        if (current_mode == pause_mode) {
+          decoder__play(&is_paused);
         }
         if (current_mode == volume_mode) {
           decoder__raise_volume();
         }
         if (current_mode == bass_mode) {
+          decoder__raise_bass();
         }
         if (current_mode == treble_mode) {
+          decoder__raise_treble();
         }
         if (current_mode == rewind_skip_mode) {
+
+          rewind_song();
         }
       }
       if (button_action == 2) {
-        if (current_mode == menu_mode) {
+        if (current_mode == pause_mode) {
+          if (!is_paused) {
+            decoder__pause(&is_paused);
+          }
         }
         if (current_mode == volume_mode) {
           decoder__lower_volume();
         }
         if (current_mode == bass_mode) {
+          decoder__lower_bass();
         }
         if (current_mode == treble_mode) {
+          decoder__lower_treble();
         }
         if (current_mode == rewind_skip_mode) {
+
+          skip_song();
         }
       }
       if (button_action == 3) {
         decoder__change_mode();
       }
-      // if (button_action == 5) {
-      //   if (is_paused) {
-      //     is_paused = false;
-      //     printf("Play\n");
-
-      //   } else {
-      //     is_paused = true;
-      //     printf("Paused\n");
-      //   }
-      // }
     }
   }
 }
 
 int main(void) {
   sj2_cli__init();
+  printf("a\n");
 
-  decoder__initialize(spi_clock_freq_in_mhz);
+  song_list_index = 0;
+
+  song_list__populate();
+  printf("a\n");
+
+  char *first_song = song_list__get_name_for_item(0);
 
   initialize_queues();
+  printf("a\n");
+
+  xQueueSend(song_name_queue, &first_song[0], 0);
+  printf("a\n");
+
+  decoder__initialize(spi_clock_freq_in_mhz);
+  printf("a\n");
 
   delay__ms(delay_time);
 
   is_paused = true;
+  is_skip = false;
+  is_rewind = false;
 
   xTaskCreate(reader_task, "Reads file from SD card", 4096 / sizeof(void *),
               NULL, PRIORITY_LOW, NULL);
@@ -177,6 +204,11 @@ int main(void) {
               4096 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
   xTaskCreate(button_controls, "Play button functions", 4096 / sizeof(void *),
               NULL, PRIORITY_LOW, NULL);
+  // xTaskCreate(lcd__menu_task, "Shows menu", 4096 / sizeof(void *), NULL,
+  //             PRIORITY_LOW, NULL);
+  // xTaskCreate(lcd__uart_print_from_queue, "Shows menu", 4096 / sizeof(void
+  // *),
+  //             NULL, PRIORITY_LOW, NULL);
 
   vTaskStartScheduler();
 
@@ -199,4 +231,30 @@ static void initialize_queues(void) {
   button_control_q = xQueueCreate(1, sizeof(uint8_t));
   pause_q = xQueueCreate(1, sizeof(uint8_t));
   play_q = xQueueCreate(1, sizeof(bool));
+}
+
+// -------------------------- Rewind / Skip Functions -------------------------
+// //
+
+static void rewind_song(void) {
+  if (song_list_index > 0) {
+    bytes_read = 0;
+    f_close(&file);
+    song_list_index = song_list_index - 2;
+    char *prev_song = song_list__get_name_for_item(song_list_index);
+
+    xQueueSend(song_name_queue, &prev_song[0], 0);
+  }
+}
+static void skip_song(void) {
+  size_t list_size = song_list__get_item_count();
+
+  if (song_list_index < list_size - 1) {
+    bytes_read = 0;
+    f_close(&file);
+    song_list_index = song_list_index + 2;
+    char *next_song = song_list__get_name_for_item(song_list_index);
+
+    xQueueSend(song_name_queue, &next_song[0], 0);
+  }
 }

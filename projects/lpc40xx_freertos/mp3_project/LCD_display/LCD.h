@@ -13,6 +13,8 @@ void lcd__play_select(void);
 void lcd__list_select(void);
 void lcd__options_select(void);
 void lcd__print_song(int song);
+void lcd__show_song(void);
+void lcd__print_song_string(char *song);
 
 // ----------- Screen Commands ----------- //
 void lcd__clear_screen(void);
