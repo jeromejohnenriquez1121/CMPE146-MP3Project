@@ -55,9 +55,11 @@ void decoder__set_reset(void);
 
 void decoder__clear_reset(void);
 
-void decoder__pause(void);
-
 void decoder__change_mode(void);
+
+void decoder__pause(bool *pause_var);
+
+void decoder__play(bool *pause_var);
 
 // ------------- Decoder Chip Selects ------------ //
 void decoder__set_xcs(void);

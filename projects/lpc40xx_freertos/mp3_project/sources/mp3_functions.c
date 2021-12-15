@@ -16,7 +16,7 @@ void mp3_functions__init_volume(void) {
                        initial_volume_low_byte);
 }
 
-void mp3_functions__init_mode(void) { current_mode = menu_mode; }
+void mp3_functions__init_mode(void) { current_mode = pause_mode; }
 
 bool mp3_functions__raise_volume(void) {
   uint16_t this_current_volume = decoder__read_from_sci(sci_volume_ctl);
@@ -78,7 +78,7 @@ char mp3_functions__get_current_volume(void) {
 }
 
 void mp3_functions__scroll_through_modes() {
-  if (current_mode == menu_mode) {
+  if (current_mode == pause_mode) {
     current_mode = volume_mode;
   } else if (current_mode == volume_mode) {
     current_mode = bass_mode;
@@ -87,6 +87,22 @@ void mp3_functions__scroll_through_modes() {
   } else if (current_mode == treble_mode) {
     current_mode = rewind_skip_mode;
   } else if (current_mode == rewind_skip_mode) {
-    current_mode = menu_mode;
+    current_mode = pause_mode;
   }
 }
+
+void mp3_functions__toggle_pause(bool *pause_var) {
+  if (*pause_var == true) {
+    *pause_var = false;
+  } else {
+    *pause_var = true;
+  }
+}
+
+void mp3_functions__enable_pause(bool *pause_var) { *pause_var = true; }
+
+
+void mp3_functions__disable_pause(bool *pause_var) { *pause_var = false; }
+
+void mp3_functions__rewind(void);
+void mp3_functions__skip(void);

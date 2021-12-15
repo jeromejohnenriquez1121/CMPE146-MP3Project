@@ -1,5 +1,6 @@
 #include "FreeRTOS.h"
 
+#include "LCD.h"
 #include "decoder.h"
 #include "delay.h"
 #include "lpc40xx.h"
@@ -17,7 +18,6 @@ QueueHandle_t play_q;
 
 static uint32_t delay_time = 100;
 
-static bool is_paused = false;
 /*********************************************************************************************************/
 //                                          Public Functions
 /*********************************************************************************************************/
@@ -40,6 +40,8 @@ void decoder__initialize(uint32_t max_clock_as_mhz) {
   mp3_functions__init_volume();
 
   mp3_functions__init_mode();
+
+  // lcd__init();
 
 #if DEBUG_ENABLE
   decoder__get_status();
@@ -132,6 +134,10 @@ void decoder__send_to_sdi(uint8_t byte_to_transfer) {
   }
 }
 
+void decoder__pause(bool *pause_var) { mp3_functions__enable_pause(pause_var); }
+
+void decoder__play(bool *pause_var) { mp3_functions__disable_pause(pause_var); }
+
 void decoder__raise_volume(void) {
   bool result = mp3_functions__raise_volume();
 
@@ -155,26 +161,6 @@ void decoder__lower_volume(void) {
            decoder__read_from_sci(sci_volume_ctl));
   else
     printf("Lower volume FAIL.\n");
-#endif
-}
-
-void decoder__pause(void) {
-  uint8_t byte = 0;
-
-  if (is_paused) {
-    is_paused = false;
-    xQueueSend(play_q, &byte, 0);
-  } else {
-    is_paused = true;
-    xQueueSend(pause_q, &byte, 0);
-  }
-
-#if DEBUG_ENABLE
-  if (is_paused) {
-    printf("Play song.\n");
-  } else {
-    printf("Pause song.\n");
-  }
 #endif
 }
 

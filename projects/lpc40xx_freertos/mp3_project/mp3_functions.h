@@ -4,11 +4,11 @@
 #include <stdint.h>
 
 typedef enum {
-  menu_mode = 0x0,
+  pause_mode = 0x0,
   volume_mode = 0x1,
   bass_mode = 0x2,
   treble_mode = 0x3,
-  rewind_skip_mode = 0x4
+  rewind_skip_mode = 0x4,
 } mode_e;
 
 typedef enum { increment_vol = 1, decrement_vol = 2 } volume_status_e;
@@ -20,6 +20,12 @@ uint16_t current_bass_level;
 void mp3_functions__scroll_through_modes();
 
 char mp3_functions__get_current_volume(void);
+
+void mp3_functions__enable_pause(bool *pause_var);
+void mp3_functions__disable_pause(bool *pause_var);
+
+void mp3_functions__rewind(void);
+void mp3_functions__skip(void);
 
 // ------------ Initialize volume and mode ------------ //
 void mp3_functions__init_volume(void);
