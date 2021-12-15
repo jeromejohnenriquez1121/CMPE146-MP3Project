@@ -1,11 +1,14 @@
 #include "FreeRTOS.h"
 
+#include "LCD.h"
 #include "decoder.h"
 #include "delay.h"
+#include "ff.h"
 #include "lpc40xx.h"
 #include "mp3_functions.h"
 #include "queue.h"
 #include "semphr.h"
+#include "song_list.h"
 #include "ssp0_mp3.h"
 #include <stdbool.h>
 #include <stdio.h>
@@ -17,7 +20,6 @@ QueueHandle_t play_q;
 
 static uint32_t delay_time = 100;
 
-static bool is_paused = false;
 /*********************************************************************************************************/
 //                                          Public Functions
 /*********************************************************************************************************/
@@ -27,19 +29,28 @@ void decoder__initialize(uint32_t max_clock_as_mhz) {
   delay__ms(delay_time);
   gpio__set(gpio_reset_pin);
   delay__ms(delay_time);
+  printf("a\n");
 
   ssp0_mp3__init(max_clock_as_mhz);
   delay__ms(delay_time);
+  printf("a\n");
 
   decoder__set_pins();
+  printf("a\n");
 
-  decoder__send_to_sci(mode, 0x48, 0x00);
+  decoder__send_to_sci(sci_mode, 0x48, 0x00);
+  printf("a\n");
 
-  decoder__send_to_sci(clock_freq, 0x60, 0x00);
+  decoder__send_to_sci(sci_clock_freq, 0x60, 0x00);
+  printf("a\n");
 
   mp3_functions__init_volume();
+  printf("a\n");
 
   mp3_functions__init_mode();
+  printf("a\n");
+
+  // lcd__init();
 
 #if DEBUG_ENABLE
   decoder__get_status();
@@ -64,7 +75,7 @@ void decoder__set_pins(void) {
   gpio_up_button = gpio__construct_with_function(2, 0, GPIO__FUNCITON_0_IO_PIN);
   gpio_down_button =
       gpio__construct_with_function(2, 1, GPIO__FUNCITON_0_IO_PIN);
-  gpio_pause_button =
+  gpio_mode_button =
       gpio__construct_with_function(2, 2, GPIO__FUNCITON_0_IO_PIN);
 
   // Set GPIO as output
@@ -76,13 +87,15 @@ void decoder__set_pins(void) {
   gpio__set_as_input(gpio_dreq_pin);
   gpio__set_as_input(gpio_up_button);
   gpio__set_as_input(gpio_down_button);
-  gpio__set_as_input(gpio_pause_button);
+  gpio__set_as_input(gpio_mode_button);
 
   // Set GPIO output
   gpio__set(gpio_xdcs_pin);
   gpio__set(gpio_xcs_pin);
   gpio__set(gpio_reset_pin);
 }
+
+//----------------------- SCI and SDI Functions -------------------------- //
 
 void decoder__send_to_sci(uint8_t address, uint8_t high_byte,
                           uint8_t low_byte) {
@@ -132,12 +145,21 @@ void decoder__send_to_sdi(uint8_t byte_to_transfer) {
   }
 }
 
+//----------------------- Play and Pauses Functions --------------------------
+////
+
+void decoder__pause(bool *pause_var) { mp3_functions__enable_pause(pause_var); }
+void decoder__play(bool *pause_var) { mp3_functions__disable_pause(pause_var); }
+
+//----------------------- Volume Functions -------------------------- //
 void decoder__raise_volume(void) {
   bool result = mp3_functions__raise_volume();
 
 #if DEBUG_ENABLE
   if (result == true)
-    printf("Raise volume SUCCESS: %04x.\n", decoder__read_from_sci(volume_ctl));
+    printf("Raise volume SUCCESS: %cv %04x.\n",
+           mp3_functions__get_current_volume(),
+           decoder__read_from_sci(sci_volume_ctl));
   else
     printf("Raise volume FAIL.\n");
 #endif
@@ -148,29 +170,19 @@ void decoder__lower_volume(void) {
 
 #if DEBUG_ENABLE
   if (result == true)
-    printf("Lower volume SUCCESS: %04x.\n", decoder__read_from_sci(volume_ctl));
+    printf("Lower volume SUCCESS: %cv %04x.\n",
+           mp3_functions__get_current_volume(),
+           decoder__read_from_sci(sci_volume_ctl));
   else
     printf("Lower volume FAIL.\n");
 #endif
 }
 
-void decoder__pause(void) {
-  uint8_t byte = 0;
-
-  if (is_paused) {
-    is_paused = false;
-    xQueueSend(play_q, &byte, 0);
-  } else {
-    is_paused = true;
-    xQueueSend(pause_q, &byte, 0);
-  }
+void decoder__change_mode(void) {
+  mp3_functions__scroll_through_modes();
 
 #if DEBUG_ENABLE
-  if (is_paused) {
-    printf("Play song.\n");
-  } else {
-    printf("Pause song.\n");
-  }
+  printf("MP3 mode: %x.\n", current_mode);
 #endif
 }
 
@@ -194,12 +206,44 @@ bool decoder__data_ready(void) {
 }
 
 void decoder__get_status(void) {
-  uint16_t mode_reading = decoder__read_from_sci(mode);
+  uint16_t mode_reading = decoder__read_from_sci(sci_mode);
   uint16_t status_reading = decoder__read_from_sci(sci_status);
-  uint16_t clock_freq_reading = decoder__read_from_sci(clock_freq);
-  uint16_t volume_reading = decoder__read_from_sci(volume_ctl);
+  uint16_t clock_freq_reading = decoder__read_from_sci(sci_clock_freq);
+  uint16_t volume_reading = decoder__read_from_sci(sci_volume_ctl);
   printf("Mode: %04x.\n", mode_reading);
   printf("Status: %04x.\n", status_reading);
   printf("Clock frequency: %04x.\n", clock_freq_reading);
   printf("Volume: %04x.\n", volume_reading);
+}
+
+//----------------------- Bass and Treble Level Functions
+//-------------------------- //
+
+void decoder__raise_bass(void) {
+  mp3_functions__raise_bass();
+
+#if DEBUG_ENABLE
+  printf("Bass Register: %04x\n.", decoder__read_from_sci(sci_bass));
+#endif
+}
+void decoder__lower_bass(void) {
+  mp3_functions__lower_bass();
+
+#if DEBUG_ENABLE
+  printf("Bass Register: %04x\n.", decoder__read_from_sci(sci_bass));
+#endif
+}
+void decoder__raise_treble(void) {
+  mp3_functions__raise_treble();
+
+#if DEBUG_ENABLE
+  printf("Bass Register: %04x\n.", decoder__read_from_sci(sci_bass));
+#endif
+}
+void decoder__lower_treble(void) {
+  mp3_functions__lower_treble();
+
+#if DEBUG_ENABLE
+  printf("Bass Register: %04x\n.", decoder__read_from_sci(sci_bass));
+#endif
 }
