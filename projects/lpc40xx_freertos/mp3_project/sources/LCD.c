@@ -213,10 +213,10 @@ void lcd__menu_task(void *parameter)
   }
 }
 
-void play_select(void) { /* return later */
+void lcd__play_select(void) { /* return later */
 }
 
-void options_select() {
+void lcd__options_select() {
   char volume[] = {'0', '1', '2',  '3',  '4',  '5',  '6',
                    '7', '8', '9', '10', '11', '12', '13'};
   char bass[] = "Bass";
@@ -317,7 +317,7 @@ void lcd__list_select(void) {
   }
 }
 
-void print_song(int song) {
+void lcd__print_song(int song) {
   char *songname;
   songname = song_list__get_name_for_item(song);
 
