@@ -10,6 +10,7 @@
 #include "delay.h"
 #include "ff.h"
 #include "gpio.h"
+#include "mp3_functions.h"
 #include "periodic_scheduler.h"
 #include "queue.h"
 #include "sj2_cli.h"
@@ -82,28 +83,28 @@ void player_task(void *parameter) {
 }
 
 void detect_input_buttons(void *parameter) {
-  uint8_t raise_volume_action = 1;
-  uint8_t lower_volume_action = 2;
-  uint8_t pause_action = 5;
+  uint8_t up_button_action = 1;
+  uint8_t down_button_action = 2;
+  uint8_t mode_action = 3;
 
   while (1) {
     if (!gpio__get(gpio_up_button)) {
       while (!gpio__get(gpio_up_button)) {
         ;
       }
-      xQueueSend(button_control_q, &raise_volume_action, 0);
+      xQueueSend(button_control_q, &up_button_action, 0);
     }
     if (!gpio__get(gpio_down_button)) {
       while (!gpio__get(gpio_down_button)) {
         ;
       }
-      xQueueSend(button_control_q, &lower_volume_action, 0);
+      xQueueSend(button_control_q, &down_button_action, 0);
     }
-    if (!gpio__get(gpio_pause_button)) {
-      while (!gpio__get(gpio_pause_button)) {
+    if (!gpio__get(gpio_mode_button)) {
+      while (!gpio__get(gpio_mode_button)) {
         ;
       }
-      xQueueSend(button_control_q, &pause_action, 0);
+      xQueueSend(button_control_q, &mode_action, 0);
     }
   }
 }
@@ -115,21 +116,44 @@ void button_controls(void *parameter) {
     button_action = 0;
     if (xQueueReceive(button_control_q, &button_action, portMAX_DELAY)) {
       if (button_action == 1) {
-        decoder__raise_volume();
-      }
-      if (button_action == 2) {
-        decoder__lower_volume();
-      }
-      if (button_action == 5) {
-        if (is_paused) {
-          is_paused = false;
-          printf("Play\n");
-
-        } else {
-          is_paused = true;
-          printf("Paused\n");
+        if (current_mode == menu_mode) {
+        }
+        if (current_mode == volume_mode) {
+          decoder__raise_volume();
+        }
+        if (current_mode == bass_mode) {
+        }
+        if (current_mode == treble_mode) {
+        }
+        if (current_mode == rewind_skip_mode) {
         }
       }
+      if (button_action == 2) {
+        if (current_mode == menu_mode) {
+        }
+        if (current_mode == volume_mode) {
+          decoder__lower_volume();
+        }
+        if (current_mode == bass_mode) {
+        }
+        if (current_mode == treble_mode) {
+        }
+        if (current_mode == rewind_skip_mode) {
+        }
+      }
+      if (button_action == 3) {
+        decoder__change_mode();
+      }
+      // if (button_action == 5) {
+      //   if (is_paused) {
+      //     is_paused = false;
+      //     printf("Play\n");
+
+      //   } else {
+      //     is_paused = true;
+      //     printf("Paused\n");
+      //   }
+      // }
     }
   }
 }

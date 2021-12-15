@@ -1,23 +1,16 @@
 
+#include "LCD.h"
+#include "FreeRTOS.h"
+#include "clock.h"
+#include "decoder.h"
+#include "ff.h"
+#include "gpio.h"
+#include "queue.h"
+#include "uart.h"
 #include <stdbool.h>
 #include <stdio.h>
 
-#include "FreeRTOS.h"
-#include "board_io.h"
-#include "common_macros.h"
-#include "ff.h"
-#include "periodic_scheduler.h"
-#include "queue.h"
-
-#include "sj2_cli.h"
-#include "task.h"
-#include "uart.h"
-#include "clock.h"
-
-#include "LCD.h"
-#include "gpio.h"
-#include "decoder.h"
-
+#include "mp3_functions.h"
 #include "song_list.h"
 
 QueueHandle_t queue_receive;
@@ -31,35 +24,30 @@ static void set_backlight(int x);
 static void set_baud(void);
 static void set_tx(void);
 
-#include DEBUG_ENABLE
+#define DEBUG_ENABLE 0
 
 /*********************************************************************************************************/
 //                                          Public Functions
 /*********************************************************************************************************/
-void lcd__init(void){
+void lcd__init(void) {
   const uint32_t lcd_baud_rate = 9600;
   queue_receive = xQueueCreate(100, sizeof(uint32_t));
   queue_transmit = xQueueCreate(100, sizeof(uint32_t));
 
-  uart__init(UART__2, clock__get_core_clock_hz, lcd_baud_rate);
-
+  uart__init(UART__2, clock__get_peripheral_clock_hz(), lcd_baud_rate);
 
   uart__enable_queues(UART__2, queue_receive, queue_transmit);
 }
-
 
 void lcd__clear_screen(void) {
   uart__polled_put(UART__2, command_word1);
   uart__polled_put(UART__2, clear_screen);
 }
 
-
 void lcd__backlight_max(void) {
   uart__polled_put(UART__2, command_word2);
   uart__polled_put(UART__2, highest_brightness);
 }
-
-
 
 void lcd__uart_print_from_queue_task(void *parameter) {
   char out;
@@ -98,7 +86,7 @@ void lcd__menu_task(void *parameter) {
 
   set_tx();
 
-  lcd__set_turn_blinking_cursor();
+  lcd__turn_blinking_cursor();
 
   int menu = 0;
   bool pass;
@@ -123,7 +111,7 @@ void lcd__menu_task(void *parameter) {
       lcd__set_cursor_second_line();
 
       for (int i = 0; i < sizeof(list) - 1; i++) {
-        lcd__uar_print(list[i]);
+        lcd__uart_print(list[i]);
       }
 
       lcd__set_cursor_end_first_line();
@@ -138,7 +126,7 @@ void lcd__menu_task(void *parameter) {
           vTaskDelay(500);
           menu = 2;
         } else if (gpio1__get_level(selectN)) {
-          play_select();
+          lcd__play_select();
           break;
         }
       }
@@ -148,7 +136,7 @@ void lcd__menu_task(void *parameter) {
       lcd__clear_screen();
 
       for (int i = 0; i < sizeof(list) - 1; i++) {
-        lcd_uart_print(list[i]);
+        lcd__uart_print(list[i]);
       }
 
       lcd__set_cursor_second_line();
@@ -170,7 +158,7 @@ void lcd__menu_task(void *parameter) {
           vTaskDelay(500);
           menu--;
         } else if (gpio1__get_level(selectN)) {
-          list_select();
+          lcd__list_select();
         }
       }
     }
@@ -179,7 +167,7 @@ void lcd__menu_task(void *parameter) {
       lcd__clear_screen();
 
       for (int i = 0; i < sizeof(options) - 1; i++) {
-        UARTprint(options[i]);
+        lcd__uart_print(options[i]);
       }
 
       lcd__set_cursor_second_line();
@@ -187,7 +175,7 @@ void lcd__menu_task(void *parameter) {
       for (int i = 0; i < sizeof(play) - 1; i++) {
         lcd__uart_print(play[i]);
       }
-      
+
       lcd__set_cursor_first_line();
 
       while (menu == option) {
@@ -205,45 +193,39 @@ void lcd__menu_task(void *parameter) {
   }
 }
 
-void play_select() {
-  /* return later */
-
+void play_select(void) { /* return later */
 }
 
 void options_select() {
-  char volume[] = "Volume";
+  char volume[] = {'0', '1', '2',  '3',  '4',  '5',  '6',
+                   '7', '8', '9', '10', '11', '12', '13'};
   char bass[] = "Bass";
   char treble[] = "Treble";
 
-  int mode = 0;
-
   while (1) {
-    clearScreen();
-    Set_Cursor_first_line();
+    lcd__clear_screen();
+    lcd__set_cursor_first_line();
 
-    if (mode == 0) {
+    if (current_mode == volume_mode) {
+      int volume_index = mp3_functions__get_current_volume;
+      lcd__uart_print(volume[volume_index]);
+      lcd__uart_print(':');
 
-      for (int i = 0; i < sizeof(volume) - 1; i++) {
-        UARTprint(volume[i]);
-      }
-      UARTprint(':');
-      
     } else if (mode == 1) {
       for (int i = 0; i < sizeof(bass) - 1; i++) {
-        UARTprint(bass[i]);
+        lcd__uart_print(bass[i]);
       }
-      UARTprint(':');
+      lcd__uart_print(':');
       /*return later       */
     }
 
     else if (mode == 2) {
       for (int i = 0; i < sizeof(treble) - 1; i++) {
-        UARTprint(treble[i]);
+        lcd__uart_print(treble[i]);
       }
-      UARTprint(':');
+      lcd__uart_print(':');
       /*return later
       UARTprint(get value for treble() )
-
 
       if(gpio(downN))
       {
@@ -262,23 +244,23 @@ void options_select() {
   }
 }
 
-void list_select() {
+void lcd__list_select(void) {
 
-  clearScreen();
+  lcd__clear_screen();
   int count = 0;
   int number_of_songs = song_list__get_item_count();
 
   while (1) {
-    lcd__clearScreen();
-    lcd_set_cursor_first_line();
+    lcd__clear_screen();
+    lcd__set_cursor_first_line();
     lcd__print_song(count);
     lcd__set_cursor_end_first_line();
 
-    #if DEBUG_ENABLE
+#if DEBUG_ENABLE
     fprintf(stderr, "%d song:", count / 2);
     fprintf(stderr, song_list__get_name_for_item(count));
     fprintf(stderr, "\n");
-    #endif
+#endif
 
     while (1) {
       if (gpio0__get_level(downN)) {
@@ -310,7 +292,7 @@ void print_song(int song) {
 
   for (int i = 0; i < 31; i++) {
     if (songname[i] != '.') {
-      UARTprint(songname[i]);
+      lcd__uart_print(songname[i]);
     }
     if (songname[i] == '.') {
       break;
@@ -322,7 +304,7 @@ void print_song(int song) {
 //                                          Private Functions
 /*********************************************************************************************************/
 
-static void set_backlight(int x){
+static void set_backlight(int x) {
   if (x > 0) {
     uart__polled_put(UART__2, command_word2);
     uart__polled_put(UART__2, (lowest_brightness));
@@ -331,10 +313,10 @@ static void set_backlight(int x){
     uart__polled_put(UART__2, highest_brightness);
   }
 }
-static void set_baud(void){
+static void set_baud(void) {
   uart__polled_put(UART__2, command_word2);
   uart__polled_put(UART__2, baud_9600);
 }
-static void set_tx(void){
+static void set_tx(void) {
   gpio__construct_with_function(0, 10, GPIO__FUNCTION_1);
 }
