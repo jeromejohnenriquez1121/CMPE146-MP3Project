@@ -1,44 +1,39 @@
 #pragma once
 
 // intialization
-void backlight(int x);
-void setBaud();
-void sj2_buttons();
-void setTX();
+void lcd__init(void);
 
-// tests
-// void LCD_task(void);
-void button_task();
+// ----------- freeRTOS tasks --------- //
+void lcd__menu_task(void *parameter);
+void lcd__uart_print_from_queue(void *parameter);
 
-// tasks
-void menu(void *parameter);
-void UARTprintFromQueue(void *parameter);
-void UARTprint(char);
-void play_select();
-void list_select();
-void options_select();
-void print_song(int);
+// ----------- LCD tasks ----------- //
+void lcd__uart_print(char symbol);
+void lcd__play_select(void);
+void lcd__list_select(void);
+void lcd__options_select(void);
+void lcd__print_song(int song);
 
-// common screen commands
-void clearScreen();
-void Turn_blinkingCursor();
-void Set_Cursor_second_line();
-void Set_Cursor_first_line();
-void Set_Cursor_End_first_line();
+// ----------- Screen Commands ----------- //
+void lcd__clear_screen(void);
+void lcd__turn_blinkingCursor(void);
+void lcd__set_cursor_second_line(void);
+void lcd__set_cursor_first_line(void);
+void lcd__set_cursor_end_first_line(void);
 
 typedef enum {
   command_word1 = 0xFE,
   command_word2 = 0x7C,
   lowest_brightness = 0x80,
   highest_brightness = 0x9D,
-  Baud_9600 = 0x0D,
-  First_Line = 0x80,
-  Second_Line = 0XC0,
-  Clear_Screen = 0x01,
-  Blinking_Cursor = 0x0D,
-  End_of_First_Line = 0x8F,
-  downN = 29,
-  upN = 30,
-  selectN = 19
+  baud_9600 = 0x0D,
+  first_line = 0x80,
+  second_line = 0XC0,
+  clear_screen = 0x01,
+  blinking_cursor = 0x0D,
+  end_of_first_line = 0x8F,
+  down_input = 29,
+  up_input = 30,
+  select_input = 19
 
 } special_commands_e;

@@ -12,9 +12,12 @@
 #include "sj2_cli.h"
 #include "task.h"
 #include "uart.h"
+#include "clock.h"
 
 #include "LCD.h"
-#include "gpio_lab.h"
+#include "gpio.h"
+#include "decoder.h"
+
 #include "song_list.h"
 
 QueueHandle_t queue_receive;
@@ -24,149 +27,78 @@ QueueHandle_t up_queue;
 QueueHandle_t down_queue;
 QueueHandle_t selectB_queue;
 
-void clearScreen() {
+static void set_backlight(int x);
+static void set_baud(void);
+static void set_tx(void);
 
-  uint32_t clear_screen = 0;
+#include DEBUG_ENABLE
 
-  clear_screen = ((clear_screen >> 8) & 0xff);
-  clear_screen = ((clear_screen >> 0) & 0xff);
-
-  uart__polled_put(UART__2, ((clear_screen >> 0) | command_word1));
-  uart__polled_put(UART__2, ((clear_screen >> 8) | Clear_Screen));
-}
-
-void backlight(int x) {
-
-  uint32_t backLight = 0;
-  backLight = ((backLight >> 0) & 0x00);
-  backLight = ((backLight >> 8) & 0x00);
-
-  if (x > 0) {
-    uart__polled_put(UART__2, ((backLight >> 0) | command_word2));
-    uart__polled_put(UART__2, ((backLight >> 8) | lowest_brightness));
-  } else {
-    uart__polled_put(UART__2, ((backLight >> 0) | command_word2));
-    uart__polled_put(UART__2, ((backLight >> 8) | highest_brightness));
-  }
-}
-
-void backlight_max() {
-  uint32_t backLight = 0;
-  backLight = ((backLight >> 0) & 0x00);
-  backLight = ((backLight >> 8) & 0x00);
-
-  uart__polled_put(UART__2, ((backLight >> 0) | command_word2));
-  uart__polled_put(UART__2, ((backLight >> 8) | highest_brightness));
-}
-
-void setBaud() {
-  uint32_t baud = 0;
-  baud = ((baud >> 0) & 0x00);
-  baud = ((baud >> 8) & 0x00);
-
-  uart__polled_put(UART__2, ((baud >> 0) | command_word2));
-  uart__polled_put(UART__2, ((baud >> 0) | Baud_9600));
-}
-
-void button_task() {
-  sj2_buttons();
-  up_queue = xQueueCreate(2, sizeof(bool));
-  down_queue = xQueueCreate(2, sizeof(bool));
-  selectB_queue = xQueueCreate(2, sizeof(bool));
-
-  bool pass = true;
-
-  while (1) {
-    if (gpio0__get_level(upN)) {
-      xQueueSend(up_queue, &pass, 0);
-    }
-    if (gpio0__get_level(downN)) {
-      xQueueSend(down_queue, &pass, 0);
-    }
-    if (gpio1__get_level(selectN)) {
-      xQueueSend(selectB_queue, &pass, 0);
-    }
-  }
-}
-
-void UARTprintFromQueue(void *parameter) {
-
+/*********************************************************************************************************/
+//                                          Public Functions
+/*********************************************************************************************************/
+void lcd__init(void){
+  const uint32_t lcd_baud_rate = 9600;
   queue_receive = xQueueCreate(100, sizeof(uint32_t));
   queue_transmit = xQueueCreate(100, sizeof(uint32_t));
 
-  LPC_IOCON->P0_10 &= 0b000;
-  LPC_IOCON->P0_10 |= 0b001; // setting pin P0_10 as tx
+  uart__init(UART__2, clock__get_core_clock_hz, lcd_baud_rate);
 
-  uart__init(UART__2, (96 * 1000 * 1000), 9600);
 
   uart__enable_queues(UART__2, queue_receive, queue_transmit);
+}
 
+
+void lcd__clear_screen(void) {
+  uart__polled_put(UART__2, command_word1);
+  uart__polled_put(UART__2, clear_screen);
+}
+
+
+void lcd__backlight_max(void) {
+  uart__polled_put(UART__2, command_word2);
+  uart__polled_put(UART__2, highest_brightness);
+}
+
+
+
+void lcd__uart_print_from_queue_task(void *parameter) {
   char out;
-
-  clearScreen();
-
-  button_task();
+  lcd__clear_screen();
 
   while (1) {
-
     xQueueReceive(up_queue, &out, portMAX_DELAY);
     uart__polled_put(UART__2, out);
   }
 }
 
-void UARTprint(char a) { uart__polled_put(UART__2, a); }
+void lcd__uart_print(char symbol) { uart__polled_put(UART__2, symbol); }
 
-void sj2_buttons() {
-  gpio__construct_as_input(0, 29); // temp for testing
-  gpio__construct_as_input(0, 30);
-  gpio__construct_as_input(1, 19);
-}
-
-void setTX() {
-  LPC_IOCON->P0_10 &= 0b000;
-  LPC_IOCON->P0_10 |= 0b001; // setting pin P0_10 as tx
-}
-
-void Turn_blinkingCursor() {
+void lcd__turn_blinking_cursor(void) {
   uart__polled_put(UART__2, command_word1);
-  uart__polled_put(UART__2, Blinking_Cursor);
+  uart__polled_put(UART__2, blinking_cursor);
 }
 
-void Set_Cursor_second_line() {
+void lcd__set_cursor_second_line(void) {
   uart__polled_put(UART__2, command_word1);
-  uart__polled_put(UART__2, Second_Line);
+  uart__polled_put(UART__2, second_line);
 }
 
-void Set_Cursor_first_line() {
+void lcd__set_cursor_first_line(void) {
   uart__polled_put(UART__2, command_word1);
-  uart__polled_put(UART__2, First_Line);
+  uart__polled_put(UART__2, first_line);
 }
 
-void Set_Cursor_End_first_line() {
+void lcd__set_cursor_end_first_line(void) {
   uart__polled_put(UART__2, command_word1);
-  uart__polled_put(UART__2, End_of_First_Line);
+  uart__polled_put(UART__2, end_of_first_line);
 }
 
-void menu(void *parameter) {
-
-  sj2_buttons(); // initalize sj2 buttons for testing.
+void lcd__menu_task(void *parameter) {
   song_list__populate();
-  // backlight_max();
-  /*
-  volatile bool downB = gpio0__get_level(downN);
-  volatile bool upB = gpio0__get_level(upN);
-  volatile bool selectB = gpio1__get_level(selectN);
-  */
-  setTX();
 
-  queue_receive = xQueueCreate(100, sizeof(uint32_t));
-  queue_transmit = xQueueCreate(100, sizeof(uint32_t));
+  set_tx();
 
-  uart__init(UART__2, (96 * 1000 * 1000), 9600);
-
-  uart__enable_queues(UART__2, queue_receive, queue_transmit);
-
-  Turn_blinkingCursor();
+  lcd__set_turn_blinking_cursor();
 
   int menu = 0;
   bool pass;
@@ -182,19 +114,19 @@ void menu(void *parameter) {
   while (1) {
 
     if (menu == playN) {
-      clearScreen();
+      lcd__clear_screen();
 
       for (int i = 0; i < sizeof(play) - 1; i++) {
-        UARTprint(play[i]);
+        lcd__uart_print(play[i]);
       }
 
-      Set_Cursor_second_line();
+      lcd__set_cursor_second_line();
 
       for (int i = 0; i < sizeof(list) - 1; i++) {
-        UARTprint(list[i]);
+        lcd__uar_print(list[i]);
       }
 
-      Set_Cursor_End_first_line();
+      lcd__set_cursor_end_first_line();
 
       while (menu == playN) {
         if (gpio0__get_level(downN)) {
@@ -213,19 +145,19 @@ void menu(void *parameter) {
     }
 
     if (menu == listN) {
-      clearScreen();
+      lcd__clear_screen();
 
       for (int i = 0; i < sizeof(list) - 1; i++) {
-        UARTprint(list[i]);
+        lcd_uart_print(list[i]);
       }
 
-      Set_Cursor_second_line();
+      lcd__set_cursor_second_line();
 
       for (int i = 0; i < sizeof(options) - 1; i++) {
-        UARTprint(options[i]);
+        lcd__uart_print(options[i]);
       }
 
-      Set_Cursor_End_first_line();
+      lcd__set_cursor_end_first_line();
 
       while (menu == listN) {
         if (gpio0__get_level(downN)) {
@@ -244,18 +176,19 @@ void menu(void *parameter) {
     }
 
     if (menu == option) {
-      clearScreen();
+      lcd__clear_screen();
 
       for (int i = 0; i < sizeof(options) - 1; i++) {
         UARTprint(options[i]);
       }
 
-      Set_Cursor_second_line();
+      lcd__set_cursor_second_line();
 
       for (int i = 0; i < sizeof(play) - 1; i++) {
-        UARTprint(play[i]);
+        lcd__uart_print(play[i]);
       }
-      Set_Cursor_End_first_line();
+      
+      lcd__set_cursor_first_line();
 
       while (menu == option) {
         if (gpio0__get_level(downN)) {
@@ -271,36 +204,10 @@ void menu(void *parameter) {
     }
   }
 }
-/*
-void LCD_task(void) {
 
-  char parameter[] = "This was sent";
-
-  LCD_queue = xQueueCreate(40, sizeof(char));
-
-  // xTaskCreate(UARTprint, "UARTprint", 4096, (void *)parameter, PRIORITY_HIGH, NULL);
-  // xTaskCreate(producer_task, "Producer Task", 4096, NULL, PRIORITY_MEDIUM, NULL);
-
-  // xTaskCreate(menu, "Menu", 4096, NULL, PRIORITY_HIGH, NULL);
-
-  // vTaskStartScheduler();
-
-  return 0;
-}
-*/
 void play_select() {
-  /* return later
+  /* return later */
 
-  int count = 0;
-   int number_of_songs = song_list__get_item_count();
-
-  while (count < number_of_songs-2)
-  {
-  play_func(count);
-  count = count+2;
-  }
-
-  */
 }
 
 void options_select() {
@@ -316,51 +223,17 @@ void options_select() {
 
     if (mode == 0) {
 
-      for (int i = 0; i < sizeof(volume) - 1; i++) 
-	  {
+      for (int i = 0; i < sizeof(volume) - 1; i++) {
         UARTprint(volume[i]);
       }
       UARTprint(':');
-      /*return later
-              UARTprint(get value for volume() )
-
-
-              if(gpio(downN))
-              {
-                      set vlue for volume -1
-              }
-      if(gpio(upN))
-      {
-                set vlue for volume +1
-      }
-              if(gpio(selectB))
-              {
-                      mode++;
-              }
-      */
-    } 
-	else if (mode == 1) {
+      
+    } else if (mode == 1) {
       for (int i = 0; i < sizeof(bass) - 1; i++) {
         UARTprint(bass[i]);
       }
       UARTprint(':');
-      /*return later
-                  UARTprint(get value for bass() )
-
-
-                  if(gpio(downN))
-                  {
-                                  set value for bass -1
-                  }
-                  if(gpio(upN))
-                  {
-                                          set value for bass +1
-                  }
-                  if(gpio(selectB))
-                  {
-                                  mode++;
-                  }
-       */
+      /*return later       */
     }
 
     else if (mode == 2) {
@@ -396,14 +269,16 @@ void list_select() {
   int number_of_songs = song_list__get_item_count();
 
   while (1) {
-    clearScreen();
-    Set_Cursor_first_line();
-    print_song(count);
-    Set_Cursor_End_first_line();
+    lcd__clearScreen();
+    lcd_set_cursor_first_line();
+    lcd__print_song(count);
+    lcd__set_cursor_end_first_line();
 
+    #if DEBUG_ENABLE
     fprintf(stderr, "%d song:", count / 2);
     fprintf(stderr, song_list__get_name_for_item(count));
     fprintf(stderr, "\n");
+    #endif
 
     while (1) {
       if (gpio0__get_level(downN)) {
@@ -414,10 +289,8 @@ void list_select() {
         vTaskDelay(500);
         count = count - 2;
         break;
-      } else if (gpio1__get_level(selectN)) { 
-		  /*return later
-          play_func(count);
-          */
+      } else if (gpio1__get_level(selectN)) {
+        /*return later */
       }
     }
 
@@ -431,9 +304,9 @@ void list_select() {
   }
 }
 
-void print_song(int x) {
+void print_song(int song) {
   char *songname;
-  songname = song_list__get_name_for_item(x);
+  songname = song_list__get_name_for_item(song);
 
   for (int i = 0; i < 31; i++) {
     if (songname[i] != '.') {
@@ -443,4 +316,25 @@ void print_song(int x) {
       break;
     }
   }
+}
+
+/*********************************************************************************************************/
+//                                          Private Functions
+/*********************************************************************************************************/
+
+static void set_backlight(int x){
+  if (x > 0) {
+    uart__polled_put(UART__2, command_word2);
+    uart__polled_put(UART__2, (lowest_brightness));
+  } else {
+    uart__polled_put(UART__2, command_word2);
+    uart__polled_put(UART__2, highest_brightness);
+  }
+}
+static void set_baud(void){
+  uart__polled_put(UART__2, command_word2);
+  uart__polled_put(UART__2, baud_9600);
+}
+static void set_tx(void){
+  gpio__construct_with_function(0, 10, GPIO__FUNCTION_1);
 }
