@@ -1,3 +1,4 @@
+#include "ff.h"
 #include "gpio.h"
 #include <stdint.h>
 
@@ -17,25 +18,25 @@ gpio_s gpio_dreq_pin;
 
 gpio_s gpio_up_button;
 gpio_s gpio_down_button;
-gpio_s gpio_pause_button;
+gpio_s gpio_mode_button;
 // ------------------- VS1053 Register Addresses ------------------- //
 typedef enum {
-  mode = 0x0,
+  sci_mode = 0x0,
   sci_status = 0x1,
-  bass = 0x2,
-  clock_freq = 0x3,
-  decode_time = 0x4,
-  audio_data = 0x5,
-  wram = 0x6,
-  wram_addr = 0x7,
-  hdat0 = 0x8,
-  hdat1 = 0x9,
-  aiaddr = 0xA,
-  volume_ctl = 0xB,
-  aictrl0 = 0xC,
-  aictrl1 = 0xD,
-  aictrl2 = 0xE,
-  aictrl3 = 0xF
+  sci_bass = 0x2,
+  sci_clock_freq = 0x3,
+  sci_decode_time = 0x4,
+  sci_audio_data = 0x5,
+  sci_wram = 0x6,
+  sci_wram_addr = 0x7,
+  sci_hdat0 = 0x8,
+  sci_hdat1 = 0x9,
+  sci_aiaddr = 0xA,
+  sci_volume_ctl = 0xB,
+  sci_aictrl0 = 0xC,
+  sci_aictrl1 = 0xD,
+  sci_aictrl2 = 0xE,
+  sci_aictrl3 = 0xF
 } sci_registers_e;
 
 // -------------- Decoder Functions ------------- //
@@ -55,7 +56,19 @@ void decoder__set_reset(void);
 
 void decoder__clear_reset(void);
 
-void decoder__pause(void);
+void decoder__change_mode(void);
+
+void decoder__pause(bool *pause_var);
+
+void decoder__play(bool *pause_var);
+
+void decoder__raise_bass(void);
+void decoder__lower_bass(void);
+void decoder__raise_treble(void);
+void decoder__lower_treble(void);
+
+// void decoder__rewind(UINT *br, size_t *song_index, FIL *file);
+// void decoder__skip(UINT *br, size_t *song_index, FIL *file);
 
 // ------------- Decoder Chip Selects ------------ //
 void decoder__set_xcs(void);
